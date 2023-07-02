@@ -1,9 +1,12 @@
+import json
 import sys
 import asyncio
 import argparse
 
 import config
+import media_platform
 from media_platform.xhs.client import XHSClient
+from media_platform.xhs.exception import DataFetchError, IPBlockError
 from media_platform.xhs.login import XHSLogin
 from tools import utils
 from base import proxy_account_pool
@@ -96,14 +99,47 @@ async def main():
             # block main crawler coroutine
             await asyncio.Event().wait()
 
+class ResponseObject:
+    def __init__(self, code, msg, data=None):
+        self.code = code
+        self.msg = msg
+        self.data = data
+    def to_dict(self):
+        return {
+            'code': self.code,
+            'msg': self.msg,
+            'data': self.data,
+        }
+
 
 async def handle(request):
     name = request.match_info.get('name', "Anonymous")
     # await crawler.start()
     # s=await crawler.start2(name)
-    s=await crawler.xhs_client.get_note_by_id(name)
-    print(s)
-    return web.json_response(s)
+    try :
+        s=await crawler.xhs_client.get_note_by_id(name)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except DataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except IPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
 
 app = web.Application()
 app.add_routes([web.get('/{name}', handle)])
@@ -113,8 +149,10 @@ if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        await crawler.close()
+        asyncio.run(crawler.close())
         sys.exit()
     except Exception as e:
         print(f"Unexpected error: {e}")
-        await crawler.close()
+        asyncio.run(crawler.close())
+        sys.exit()
+
