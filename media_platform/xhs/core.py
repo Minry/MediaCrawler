@@ -102,11 +102,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
 
             # Search for notes and retrieve their comment information.
             # await self.search_posts()
+            print(await self.xhs_client.get_note_by_id("648912e70000000012033f1a"))
 
             # block main crawler coroutine
-            # await asyncio.Event().wait()
-            print(await self.xhs_client.get_note_by_id("648912e70000000012033f1a"))
-            await self.close()
+            await asyncio.Event().wait()
+            # await self.close()
 
 
     async def start2(self, note_id: str):
