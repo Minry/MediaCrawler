@@ -3,7 +3,7 @@ import logging
 import asyncio
 import functools
 
-import aioredis
+import redis
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -125,7 +125,7 @@ class DouYinLogin(AbstractLogin):
         # 检查是否有滑动验证码
         await self.check_page_display_slider(move_step=10, slider_level="easy")
 
-        redis_obj = aioredis.from_url(url=config.REDIS_DB_HOST, password=config.REDIS_DB_PWD, decode_responses=True)
+        redis_obj = redis.from_url(url=config.REDIS_DB_HOST, password=config.REDIS_DB_PWD, decode_responses=True)
         max_get_sms_code_time = 60 * 2  # 最长获取验证码的时间为2分钟
         while max_get_sms_code_time > 0:
             logging.info(f"get douyin sms code from redis remaining time {max_get_sms_code_time}s ...")
