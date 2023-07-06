@@ -17,7 +17,9 @@ from playwright.async_api import Page
 from playwright.async_api import Cookie
 from playwright.async_api import BrowserContext
 from playwright.async_api import async_playwright
+from media_platform.xhs import field
 
+routes = web.RouteTableDef()
 class CrawlerFactory:
     @staticmethod
     def create_crawler(platform: str):
@@ -93,7 +95,7 @@ async def main():
             )
 
             # Search for notes and retrieve their comment information.
-            # await self.search_posts()
+            # await crawler.search_posts()
             print(await crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
 
             # block main crawler coroutine
@@ -111,13 +113,13 @@ class ResponseObject:
             'data': self.data,
         }
 
-
-async def handle(request):
-    name = request.match_info.get('name', "Anonymous")
+@routes.get("/note/{id}")
+async def handle_noteid(request):
+    id = request.match_info['id']
     # await crawler.start()
     # s=await crawler.start2(name)
     try :
-        s=await crawler.xhs_client.get_note_by_id(name)
+        s=await crawler.xhs_client.get_note_by_id(id)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success",s)
         # 转换为 JSON 字符串
@@ -141,9 +143,51 @@ async def handle(request):
         print(response.to_dict())
         return web.json_response(response.to_dict())
 
-app = web.Application()
-app.add_routes([web.get('/{name}', handle)])
 
+@routes.get("/notes/keyword")
+async def handle_keyword(request):
+    # 获取查询参数，request.query是一个MultiDictProxy对象，我们可以向字典一样操作它
+    params = request.query
+    keyword = params.get("keyword")  # 使用get方法，如果不存在该key值，会返回None
+    page = params.get("page")  # 使用get方法，如果不存在该key值，会返回None
+    if keyword is None:
+        response = ResponseObject(3, "参数非法")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    if page is None:
+        response = ResponseObject(3, "参数非法")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    try :
+        s=await crawler.xhs_client.get_note_by_keyword(keyword=keyword,page=page,sort=field.SearchSortType.LATEST)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except DataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except IPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
+
+app = web.Application()
+app.add_routes(routes)
 
 if __name__ == '__main__':
     try:
