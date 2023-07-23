@@ -2,6 +2,7 @@
 import re
 import json
 import asyncio
+from typing import List
 
 import aioredis
 import tornado.web
@@ -14,7 +15,7 @@ def extract_verification_code(message) -> str:
     Extract verification code of 6 digits from the SMS.
     """
     pattern = re.compile(r'\b[0-9]{6}\b')
-    codes = pattern.findall(message)
+    codes: List[str]= pattern.findall(message)
     return codes[0] if codes and len(codes) > 0 else ""
 
 
@@ -46,7 +47,7 @@ class RecvSmsNotificationHandler(tornado.web.RequestHandler):
         request_body = self.request.body.decode("utf-8")
         req_body_dict = json.loads(request_body)
         print("recv sms notification and body content: ", req_body_dict)
-        redis_obj = aioredis.from_url(url=config.redis_db_host, password=config.redis_db_pwd, decode_responses=True)
+        redis_obj = aioredis.from_url(url=config.REDIS_DB_HOST, password=config.REDIS_DB_PWD, decode_responses=True)
         sms_content = req_body_dict.get("sms_content")
         sms_code = extract_verification_code(sms_content)
         if sms_code:

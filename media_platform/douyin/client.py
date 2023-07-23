@@ -6,9 +6,11 @@ import httpx
 import execjs
 import urllib.parse
 from playwright.async_api import Page
+from playwright.async_api import BrowserContext
 
 from .field import *
 from .exception import *
+from tools import utils
 
 
 class DOUYINClient:
@@ -16,9 +18,10 @@ class DOUYINClient:
             self,
             timeout=30,
             proxies=None,
-            headers: Optional[Dict] = None,
-            playwright_page: Page = None,
-            cookie_dict: Dict = None
+            *,
+            headers: Dict,
+            playwright_page: Optional[Page],
+            cookie_dict: Dict
     ):
         self.proxies = proxies
         self.timeout = timeout
@@ -31,9 +34,8 @@ class DOUYINClient:
         if not params:
             return
         headers = headers or self.headers
-        local_storage: Dict = await self.playwright_page.evaluate("() => window.localStorage")
+        local_storage: Dict = await self.playwright_page.evaluate("() => window.localStorage") # type: ignore
         douyin_js_obj = execjs.compile(open('libs/douyin.js').read())
-        # douyin_js_obj = execjs.compile(open('libs/X-Bogus.js').read())
         common_params = {
             "device_platform": "webapp",
             "aid": "6383",
@@ -82,6 +84,17 @@ class DOUYINClient:
         headers = headers or self.headers
         return await self.request(method="POST", url=f"{self._host}{uri}", data=data, headers=headers)
 
+    @staticmethod
+    async def ping(browser_context: BrowserContext) -> bool:
+        _, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+        # todo send some api to test login status
+        return cookie_dict.get("LOGIN_STATUS") == "1"
+
+    async def update_cookies(self, browser_context: BrowserContext):
+        cookie_str, cookie_dict = utils.convert_cookies(await browser_context.cookies())
+        self.headers["Cookie"] = cookie_str
+        self.cookie_dict = cookie_dict
+
     async def search_info_by_keyword(
             self,
             keyword: str,
@@ -129,7 +142,7 @@ class DOUYINClient:
         del headers["Origin"]
         return await self.get("/aweme/v1/web/aweme/detail/", params, headers)
 
-    async def get_aweme_comments(self, aweme_id: str, cursor: str = ""):
+    async def get_aweme_comments(self, aweme_id: str, cursor: int = 0):
         """get note comments
 
         """
