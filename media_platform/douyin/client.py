@@ -1,16 +1,17 @@
-import copy
 import asyncio
-from typing import Optional, Dict, Callable
-
-import httpx
-import execjs
+import copy
 import urllib.parse
-from playwright.async_api import Page
-from playwright.async_api import BrowserContext
+from typing import Callable, Dict, Optional
 
-from .field import *
-from .exception import *
+import execjs
+import httpx
+from playwright.async_api import BrowserContext, Page
+
 from tools import utils
+from var import request_keyword_var
+
+from .exception import *
+from .field import *
 
 
 class DOUYINClient:
@@ -34,7 +35,7 @@ class DOUYINClient:
         if not params:
             return
         headers = headers or self.headers
-        local_storage: Dict = await self.playwright_page.evaluate("() => window.localStorage") # type: ignore
+        local_storage: Dict = await self.playwright_page.evaluate("() => window.localStorage")  # type: ignore
         douyin_js_obj = execjs.compile(open('libs/douyin.js').read())
         common_params = {
             "device_platform": "webapp",
@@ -53,8 +54,8 @@ class DOUYINClient:
             "platform": "PC",
             "screen_width": "1920",
             "screen_height": "1200",
-            "webid": douyin_js_obj.call("get_web_id"),
-            "msToken": local_storage.get("xmst"),
+            #" webid": douyin_js_obj.call("get_web_id"),
+            # "msToken": local_storage.get("xmst"),
             # "msToken": "abL8SeUTPa9-EToD8qfC7toScSADxpg6yLh2dbNcpWHzE0bT04txM_4UwquIcRvkRb9IU8sifwgM1Kwf1Lsld81o9Irt2_yNyUbbQPSUO8EfVlZJ_78FckDFnwVBVUVK",
         }
         params.update(common_params)
@@ -153,6 +154,10 @@ class DOUYINClient:
             "count": 20,
             "item_type": 0
         }
+        keywords = request_keyword_var.get()
+        referer_url = "https://www.douyin.com/search/" + keywords + '?aid=3a3cec5a-9e27-4040-b6aa-ef548c2c1138&publish_time=0&sort_type=0&source=search_history&type=general'
+        headers = copy.copy(self.headers)
+        headers["Referer"] = urllib.parse.quote(referer_url, safe=':/')
         return await self.get(uri, params)
 
     async def get_aweme_all_comments(
@@ -160,7 +165,7 @@ class DOUYINClient:
             aweme_id: str,
             crawl_interval: float = 1.0,
             is_fetch_sub_comments=False,
-            callback: Optional[Callable] = None
+            callback: Optional[Callable] = None,
     ):
         """
         get note all comments include sub comments

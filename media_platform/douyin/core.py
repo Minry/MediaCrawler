@@ -1,38 +1,39 @@
-import os
 import asyncio
+import os
 from asyncio import Task
-from argparse import Namespace
-from typing import Optional, List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from playwright.async_api import async_playwright
-from playwright.async_api import BrowserType
-from playwright.async_api import BrowserContext
-from playwright.async_api import Page
+from playwright.async_api import (BrowserContext, BrowserType, Page,
+                                  async_playwright)
 
 import config
-from tools import utils
-from .client import DOUYINClient
-from .exception import DataFetchError
-from .login import DouYinLogin
 from base.base_crawler import AbstractCrawler
 from base.proxy_account_pool import AccountPool
 from models import douyin
+from tools import utils
+from var import request_keyword_var
+
+from .client import DOUYINClient
+from .exception import DataFetchError
+from .login import DouYinLogin
 
 
 class DouYinCrawler(AbstractCrawler):
+    platform: str
+    login_type: str
+    context_page: Page
     dy_client: DOUYINClient
+    account_pool: AccountPool
+    browser_context: BrowserContext
 
     def __init__(self) -> None:
-        self.browser_context: Optional[BrowserContext] = None # type: ignore
-        self.context_page: Optional[Page] = None # type: ignore
         self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36"  # fixed
         self.index_url = "https://www.douyin.com"
-        self.command_args: Optional[Namespace] = None # type: ignore
-        self.account_pool: Optional[AccountPool] = None # type: ignore
 
-    def init_config(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+    def init_config(self, platform: str, login_type: str, account_pool: AccountPool) -> None:
+        self.platform = platform
+        self.login_type = login_type
+        self.account_pool = account_pool
 
     async def start(self) -> None:
         account_phone, playwright_proxy, httpx_proxy = self.create_proxy_info()
@@ -53,7 +54,7 @@ class DouYinCrawler(AbstractCrawler):
             self.dy_client = await self.create_douyin_client(httpx_proxy)
             if not await self.dy_client.ping(browser_context=self.browser_context):
                 login_obj = DouYinLogin(
-                    login_type=self.command_args.lt, # type: ignore
+                    login_type=self.login_type,
                     login_phone=account_phone,
                     browser_context=self.browser_context,
                     context_page=self.context_page,
@@ -63,52 +64,55 @@ class DouYinCrawler(AbstractCrawler):
                 await self.dy_client.update_cookies(browser_context=self.browser_context)
 
             # search_posts
-            await self.search_posts()
+            await self.search()
 
             utils.logger.info("Douyin Crawler finished ...")
 
-    async def search_posts(self) -> None:
+    async def search(self) -> None:
         utils.logger.info("Begin search douyin keywords")
         for keyword in config.KEYWORDS.split(","):
+            request_keyword_var.set(keyword)
             utils.logger.info(f"Current keyword: {keyword}")
             aweme_list: List[str] = []
-            max_note_len = config.MAX_PAGE_NUM
+            dy_limit_count = 10  # douyin fixed limit page 10
             page = 0
-            while max_note_len > 0:
+            while (page + 1) * dy_limit_count <= config.CRAWLER_MAX_NOTES_COUNT:
                 try:
-                    posts_res = await self.dy_client.search_info_by_keyword(keyword=keyword, offset=page * 10)
+                    posts_res = await self.dy_client.search_info_by_keyword(keyword=keyword,
+                                                                            offset=page * dy_limit_count)
                 except DataFetchError:
                     utils.logger.error(f"search douyin keyword: {keyword} failed")
                     break
                 page += 1
-                max_note_len -= 10
                 for post_item in posts_res.get("data"):
                     try:
                         aweme_info: Dict = post_item.get("aweme_info") or \
                                            post_item.get("aweme_mix_info", {}).get("mix_items")[0]
                     except TypeError:
                         continue
-                    aweme_list.append(aweme_info.get("aweme_id",""))
+                    aweme_list.append(aweme_info.get("aweme_id", ""))
                     await douyin.update_douyin_aweme(aweme_item=aweme_info)
             utils.logger.info(f"keyword:{keyword}, aweme_list:{aweme_list}")
-            # await self.batch_get_note_comments(aweme_list)
+            await self.batch_get_note_comments(aweme_list)
 
-    async def batch_get_note_comments(self, aweme_list: List[str]):
+    async def batch_get_note_comments(self, aweme_list: List[str]) -> None:
         task_list: List[Task] = []
+        semaphore = asyncio.Semaphore(config.MAX_CONCURRENCY_NUM)
         for aweme_id in aweme_list:
-            task = asyncio.create_task(self.get_comments(aweme_id), name=aweme_id)
+            task = asyncio.create_task(self.get_comments(aweme_id, semaphore), name=aweme_id)
             task_list.append(task)
         await asyncio.wait(task_list)
 
-    async def get_comments(self, aweme_id: str):
-        try:
-            await self.dy_client.get_aweme_all_comments(
-                aweme_id=aweme_id,
-                callback=douyin.batch_update_dy_aweme_comments
-            )
-            utils.logger.info(f"aweme_id: {aweme_id} comments have all been obtained completed ...")
-        except DataFetchError as e:
-            utils.logger.error(f"aweme_id: {aweme_id} get comments failed, error: {e}")
+    async def get_comments(self, aweme_id: str, semaphore: asyncio.Semaphore) -> None:
+        async with semaphore:
+            try:
+                await self.dy_client.get_aweme_all_comments(
+                    aweme_id=aweme_id,
+                    callback=douyin.batch_update_dy_aweme_comments,
+                )
+                utils.logger.info(f"aweme_id: {aweme_id} comments have all been obtained completed ...")
+            except DataFetchError as e:
+                utils.logger.error(f"aweme_id: {aweme_id} get comments failed, error: {e}")
 
     def create_proxy_info(self) -> Tuple[Optional[str], Optional[Dict], Optional[str]]:
         """Create proxy info for playwright and httpx"""
@@ -116,7 +120,7 @@ class DouYinCrawler(AbstractCrawler):
             return None, None, None
 
         # phone: 13012345671  ip_proxy: 111.122.xx.xx1:8888
-        phone, ip_proxy = self.account_pool.get_account() # type: ignore
+        phone, ip_proxy = self.account_pool.get_account()  # type: ignore
         playwright_proxy = {
             "server": f"{config.IP_PROXY_PROTOCOL}{ip_proxy}",
             "username": config.IP_PROXY_USER,
@@ -127,7 +131,7 @@ class DouYinCrawler(AbstractCrawler):
 
     async def create_douyin_client(self, httpx_proxy: Optional[str]) -> DOUYINClient:
         """Create douyin client"""
-        cookie_str, cookie_dict = utils.convert_cookies(await self.browser_context.cookies()) # type: ignore
+        cookie_str, cookie_dict = utils.convert_cookies(await self.browser_context.cookies())  # type: ignore
         douyin_client = DOUYINClient(
             proxies=httpx_proxy,
             headers={
@@ -152,25 +156,26 @@ class DouYinCrawler(AbstractCrawler):
     ) -> BrowserContext:
         """Launch browser and create browser context"""
         if config.SAVE_LOGIN_STATE:
-            user_data_dir = os.path.join(os.getcwd(), "browser_data", config.USER_DATA_DIR % self.command_args.platform) # type: ignore
+            user_data_dir = os.path.join(os.getcwd(), "browser_data",
+                                         config.USER_DATA_DIR % self.platform)  # type: ignore
             browser_context = await chromium.launch_persistent_context(
                 user_data_dir=user_data_dir,
                 accept_downloads=True,
                 headless=headless,
-                proxy=playwright_proxy, # type: ignore
+                proxy=playwright_proxy,  # type: ignore
                 viewport={"width": 1920, "height": 1080},
                 user_agent=user_agent
-            ) # type: ignore
+            )  # type: ignore
             return browser_context
         else:
-            browser = await chromium.launch(headless=headless, proxy=playwright_proxy) # type: ignore
+            browser = await chromium.launch(headless=headless, proxy=playwright_proxy)  # type: ignore
             browser_context = await browser.new_context(
                 viewport={"width": 1920, "height": 1080},
                 user_agent=user_agent
             )
             return browser_context
 
-    async def close(self):
+    async def close(self) -> None:
         """Close browser context"""
         await self.browser_context.close()
         utils.logger.info("Browser context closed ...")

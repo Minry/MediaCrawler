@@ -1,22 +1,17 @@
-import sys
 import asyncio
 import functools
+import sys
 from typing import Optional
 
 import redis
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_fixed,
-    retry_if_result,
-    RetryError
-)
-from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import BrowserContext
+from playwright.async_api import BrowserContext, Page
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
+                      wait_fixed)
 
 import config
-from tools import utils
 from base.base_crawler import AbstractLogin
+from tools import utils
 
 
 class DouYinLogin(AbstractLogin):
@@ -49,10 +44,10 @@ class DouYinLogin(AbstractLogin):
             await self.login_by_qrcode()
         elif self.login_type == "phone":
             await self.login_by_mobile()
-        elif self.login_type == "cookies":
+        elif self.login_type == "cookie":
             await self.login_by_cookies()
         else:
-            raise ValueError("Invalid Login Type Currently only supported qrcode or phone ...")
+            raise ValueError("Invalid Login Type Currently only supported qrcode or phone or cookie ...")
 
         # 如果页面重定向到滑动验证码页面，需要再次滑动滑块
         await asyncio.sleep(6)
@@ -126,20 +121,19 @@ class DouYinLogin(AbstractLogin):
 
         # 检查是否有滑动验证码
         await self.check_page_display_slider(move_step=10, slider_level="easy")
-
-        redis_obj = redis.from_url(url=config.REDIS_DB_HOST, password=config.REDIS_DB_PWD, decode_responses=True)
+        redis_obj = redis.Redis(host=config.REDIS_DB_HOST, password=config.REDIS_DB_PWD)
         max_get_sms_code_time = 60 * 2  # 最长获取验证码的时间为2分钟
         while max_get_sms_code_time > 0:
             utils.logger.info(f"get douyin sms code from redis remaining time {max_get_sms_code_time}s ...")
             await asyncio.sleep(1)
             sms_code_key = f"dy_{self.login_phone}"
-            sms_code_value = await redis_obj.get(sms_code_key)
+            sms_code_value = redis_obj.get(sms_code_key)
             if not sms_code_value:
                 max_get_sms_code_time -= 1
                 continue
 
             sms_code_input_ele = self.context_page.locator("xpath=//input[@placeholder='请输入验证码']")
-            await sms_code_input_ele.fill(value=sms_code_value)
+            await sms_code_input_ele.fill(value=sms_code_value.decode())
             await asyncio.sleep(0.5)
             submit_btn_ele = self.context_page.locator("xpath=//button[@class='web-login-button']")
             await submit_btn_ele.click()  # 点击登录

@@ -1,15 +1,15 @@
-import json
 import asyncio
-from typing import Optional, Dict
+import json
+from typing import Dict, Optional
 
 import httpx
-from playwright.async_api import Page
-from playwright.async_api import BrowserContext
+from playwright.async_api import BrowserContext, Page
 
-from .help import sign, get_search_id
-from .field import SearchSortType, SearchNoteType
-from .exception import DataFetchError, IPBlockError
 from tools import utils
+
+from .exception import DataFetchError, IPBlockError
+from .field import SearchNoteType, SearchSortType
+from .help import get_search_id, sign
 
 
 class XHSClient:
@@ -82,13 +82,16 @@ class XHSClient:
 
     async def ping(self) -> bool:
         """get a note to check if login state is ok"""
-        utils.logger.info("begin to ping xhs...")
-        note_id = "5e5cb38a000000000100185e"
+        utils.logger.info("Begin to ping xhs...")
+        ping_flag = False
         try:
-            note_card: Dict = await self.get_note_by_id(note_id)
-            return note_card.get("note_id") == note_id
-        except Exception:
-            return False
+            note_card: Dict = await self.get_note_by_keyword(keyword="小红书")
+            if note_card.get("items"):
+                ping_flag = True
+        except Exception as e:
+            utils.logger.error(f"Ping xhs failed: {e}, and try to login again...")
+            ping_flag = False
+        return ping_flag
 
     async def update_cookies(self, browser_context: BrowserContext):
         cookie_str, cookie_dict = utils.convert_cookies(await browser_context.cookies())
