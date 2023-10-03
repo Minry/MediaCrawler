@@ -18,6 +18,8 @@ from playwright.async_api import Cookie
 from playwright.async_api import BrowserContext
 from playwright.async_api import async_playwright
 from media_platform.xhs import field
+import time
+
 
 routes = web.RouteTableDef()
 class CrawlerFactory:
@@ -66,6 +68,7 @@ async def main():
         await crawler.context_page.goto(crawler.index_url)
 
         # Create a client to interact with the xiaohongshu website.
+        time.sleep(3)
         crawler.xhs_client = await crawler.create_xhs_client(httpx_proxy)
         if not await crawler.xhs_client.ping():
             login_obj = XHSLogin(
