@@ -5,6 +5,7 @@ import argparse
 
 import config
 import media_platform
+from media_platform.douyin.login import DouYinLogin
 from media_platform.xhs.client import XHSClient
 from media_platform.xhs.exception import DataFetchError, IPBlockError
 from media_platform.xhs.login import XHSLogin
@@ -32,7 +33,6 @@ class CrawlerFactory:
         else:
             raise ValueError("Invalid Media Platform Currently only supported xhs or douyin ...")
 
-crawler = CrawlerFactory().create_crawler(platform=config.PLATFORM)
 utils.init_loging_config()
 # define command line params ...
 parser = argparse.ArgumentParser(description='Media crawler program.')
@@ -41,6 +41,7 @@ parser.add_argument('--lt', type=str, help='Login type (qrcode | phone | cookie)
 # init account pool
 account_pool = proxy_account_pool.create_account_pool()
 args = parser.parse_args()
+crawler = CrawlerFactory().create_crawler(platform=args.platform)
 crawler.init_config(
     platform=args.platform,
     login_type=args.lt,
@@ -51,7 +52,7 @@ account_phone, playwright_proxy, httpx_proxy = crawler.create_proxy_info()
 async def main():
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8081)
+    site = web.TCPSite(runner, 'localhost', 8082)
     await site.start()
     async with async_playwright() as playwright:
         # launch browser and create single browser context
@@ -65,22 +66,11 @@ async def main():
 
         # execute JS to bypass anti automation/crawler detection
         await crawler.browser_context.add_init_script(path="libs/stealth.min.js")
-        # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
-        if crawler.platform =="xhs" and crawler.login_type != "cookie"  :
-            await crawler.browser_context.add_cookies([{
-                'name': "webId",
-                'value': "xxx123",  # any value
-                'domain': ".xiaohongshu.com",
-                'path': "/"
-            }])
         crawler.context_page = await crawler.browser_context.new_page()
         await crawler.context_page.goto(crawler.index_url)
-
-        # Create a client to interact with the xiaohongshu website.
-        time.sleep(3)
-        crawler.xhs_client = await crawler.create_xhs_client(httpx_proxy)
-        if (crawler.platform =="xhs" and crawler.login_type == "cookie" ) or not await crawler.xhs_client.ping():
-            login_obj = XHSLogin(
+        crawler.dy_client = await crawler.create_douyin_client(httpx_proxy)
+        if not await crawler.dy_client.ping(browser_context=crawler.browser_context):
+            login_obj = DouYinLogin(
                 login_type=crawler.login_type,
                 login_phone=account_phone,
                 browser_context=crawler.browser_context,
@@ -88,12 +78,12 @@ async def main():
                 cookie_str=config.COOKIES
             )
             await login_obj.begin()
-            await crawler.xhs_client.update_cookies(browser_context=crawler.browser_context)
+            await crawler.dy_client.update_cookies(browser_context=crawler.browser_context)
 
-        # Search for notes and retrieve their comment information.
-        # await crawler.search_posts()
-        print(await crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
+        # search_posts
+        s=await crawler.dy_client.get_video_by_id(aweme_id="7211398361495211264")
 
+        utils.logger.info("Douyin Crawler finished ...")
         # block main crawler coroutine
         await asyncio.Event().wait()
 
