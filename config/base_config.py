@@ -1,9 +1,9 @@
 # Desc: base config
 PLATFORM = "xhs"
 KEYWORDS = "python,golang"
-LOGIN_TYPE = "qrcode"  # qrcode or phone or cookie
-COOKIES = ""  # login by cookie, if login_type is cookie, you must set this value
-
+LOGIN_TYPE = "qrcode"  # qrcode or phone or cookies
+LOGIN_TYPE_COOKIE = "cookie"  # qrcode or phone or cookies
+COOKIES = "web_session=030037a3824fcc373b5ef45dc9234a4ebc975f;"
 # enable ip proxy
 ENABLE_IP_PROXY = False
 
