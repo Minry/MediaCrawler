@@ -7,7 +7,8 @@ import config
 import media_platform
 from media_platform.douyin.login import DouYinLogin
 from media_platform.xhs.client import XHSClient
-from media_platform.xhs.exception import DataFetchError, IPBlockError
+from media_platform.xhs.exception import DataFetchError as XhsDataFetchError, IPBlockError as XhsIPBlockError
+from media_platform.douyin.exception import DataFetchError as DouyinDataFetchError, IPBlockError as DouyinIPBlockError
 from media_platform.xhs.login import XHSLogin
 from tools import utils
 from base import proxy_account_pool
@@ -81,7 +82,9 @@ async def main():
             await crawler.dy_client.update_cookies(browser_context=crawler.browser_context)
 
         # search_posts
-        s=await crawler.dy_client.get_video_by_id(aweme_id="7211398361495211264")
+        # s=await crawler.dy_client.get_video_by_id(aweme_id="7211398361495211264")
+        # print(s)
+        # await crawler.search()
 
         utils.logger.info("Douyin Crawler finished ...")
         # block main crawler coroutine
@@ -99,6 +102,39 @@ class ResponseObject:
             'data': self.data,
         }
 
+
+@routes.get("/dy/{id}")
+async def handle_dyid(request):
+    id = request.match_info['id']
+    # await crawler.start()
+    # s=await crawler.start2(name)
+    try :
+        s=await crawler.dy_client.get_video_by_id(id)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except DouyinDataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except DouyinIPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
+
+
 @routes.get("/note/{id}")
 async def handle_noteid(request):
     id = request.match_info['id']
@@ -112,12 +148,12 @@ async def handle_noteid(request):
         # json_str = json.dumps(response.__dict__)
         print(response.to_dict())
         return web.json_response(response.to_dict())
-    except DataFetchError as e:
+    except XhsDataFetchError as e:
         response = ResponseObject(1,f"{e}")
         # 转换为 JSON 字符串
         print(response.to_dict())
         return web.json_response(response.to_dict())
-    except IPBlockError as e:
+    except XhsIPBlockError as e:
         response = ResponseObject(2,f"{e}")
         # 转换为 JSON 字符串
         print(response.to_dict())
@@ -154,12 +190,12 @@ async def handle_keyword(request):
         # json_str = json.dumps(response.__dict__)
         print(response.to_dict())
         return web.json_response(response.to_dict())
-    except DataFetchError as e:
+    except XhsDataFetchError as e:
         response = ResponseObject(1,f"{e}")
         # 转换为 JSON 字符串
         print(response.to_dict())
         return web.json_response(response.to_dict())
-    except IPBlockError as e:
+    except XhsIPBlockError as e:
         response = ResponseObject(2,f"{e}")
         # 转换为 JSON 字符串
         print(response.to_dict())

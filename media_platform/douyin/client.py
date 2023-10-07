@@ -139,7 +139,7 @@ class DOUYINClient:
             "aweme_id": aweme_id
         }
         headers = copy.copy(self.headers)
-        headers["Cookie"] = "s_v_web_id=verify_leytkxgn_kvO5kOmO_SdMs_4t1o_B5ml_BUqtWM1mP6BF;"
+        # headers["Cookie"] = "s_v_web_id=verify_leytkxgn_kvO5kOmO_SdMs_4t1o_B5ml_BUqtWM1mP6BF;"
         del headers["Origin"]
         return await self.get("/aweme/v1/web/aweme/detail/", params, headers)
 
