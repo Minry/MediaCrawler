@@ -65,7 +65,7 @@ xhs_account_phone, xhs_playwright_proxy, xhs_httpx_proxy = xhs_crawler.create_pr
 async def main():
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8082)
+    site = web.TCPSite(runner, 'localhost', 8081)
     await site.start()
     async with async_playwright() as playwright:
         # launch browser and create single browser context
