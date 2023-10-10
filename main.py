@@ -42,13 +42,25 @@ parser.add_argument('--lt', type=str, help='Login type (qrcode | phone | cookie)
 # init account pool
 account_pool = proxy_account_pool.create_account_pool()
 args = parser.parse_args()
-crawler = CrawlerFactory().create_crawler(platform=args.platform)
-crawler.init_config(
-    platform=args.platform,
-    login_type=args.lt,
+
+dy_crawler = CrawlerFactory().create_crawler(platform="dy")
+dy_crawler.init_config(
+    platform="dy",
+    login_type="qrcode",
     account_pool=account_pool
 )
-account_phone, playwright_proxy, httpx_proxy = crawler.create_proxy_info()
+dy_account_phone, dy_playwright_proxy, dy_httpx_proxy = dy_crawler.create_proxy_info()
+
+xhs_crawler = CrawlerFactory().create_crawler(platform="xhs")
+xhs_crawler.init_config(
+    platform="xhs",
+    login_type="cookie",
+    account_pool=account_pool
+)
+xhs_account_phone, xhs_playwright_proxy, xhs_httpx_proxy = xhs_crawler.create_proxy_info()
+
+
+
 
 async def main():
     runner = web.AppRunner(app)
@@ -58,28 +70,66 @@ async def main():
     async with async_playwright() as playwright:
         # launch browser and create single browser context
         chromium = playwright.chromium
-        crawler.browser_context = await crawler.launch_browser(
+        xhs_crawler.browser_context = await xhs_crawler.launch_browser(
             chromium,
-            playwright_proxy,
-            crawler.user_agent,
+            xhs_playwright_proxy,
+            xhs_crawler.user_agent,
             headless=config.HEADLESS
         )
 
         # execute JS to bypass anti automation/crawler detection
-        await crawler.browser_context.add_init_script(path="libs/stealth.min.js")
-        crawler.context_page = await crawler.browser_context.new_page()
-        await crawler.context_page.goto(crawler.index_url)
-        crawler.dy_client = await crawler.create_douyin_client(httpx_proxy)
-        if not await crawler.dy_client.ping(browser_context=crawler.browser_context):
-            login_obj = DouYinLogin(
-                login_type=crawler.login_type,
-                login_phone=account_phone,
-                browser_context=crawler.browser_context,
-                context_page=crawler.context_page,
+        await xhs_crawler.browser_context.add_init_script(path="libs/stealth.min.js")
+        # add a cookie attribute webId to avoid the appearance of a sliding captcha on the webpage
+        if xhs_crawler.platform =="xhs" and xhs_crawler.login_type != "cookie"  :
+            await xhs_crawler.browser_context.add_cookies([{
+                'name': "webId",
+                'value': "xxx123",  # any value
+                'domain': ".xiaohongshu.com",
+                'path': "/"
+            }])
+        xhs_crawler.context_page = await xhs_crawler.browser_context.new_page()
+        await xhs_crawler.context_page.goto(xhs_crawler.index_url)
+
+        # Create a client to interact with the xiaohongshu website.
+        time.sleep(3)
+        xhs_crawler.xhs_client = await xhs_crawler.create_xhs_client(xhs_httpx_proxy)
+        if (xhs_crawler.platform =="xhs" and xhs_crawler.login_type == "cookie" ) or not await xhs_crawler.xhs_client.ping():
+            login_obj = XHSLogin(
+                login_type=xhs_crawler.login_type,
+                login_phone=xhs_account_phone,
+                browser_context=xhs_crawler.browser_context,
+                context_page=xhs_crawler.context_page,
                 cookie_str=config.COOKIES
             )
             await login_obj.begin()
-            await crawler.dy_client.update_cookies(browser_context=crawler.browser_context)
+            await xhs_crawler.xhs_client.update_cookies(browser_context=xhs_crawler.browser_context)
+
+        # Search for notes and retrieve their comment information.
+        # await crawler.search_posts()
+        print(await xhs_crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
+
+        dy_crawler.browser_context = await dy_crawler.launch_browser(
+            chromium,
+            dy_playwright_proxy,
+            dy_crawler.user_agent,
+            headless=config.HEADLESS
+        )
+
+        # execute JS to bypass anti automation/crawler detection
+        await dy_crawler.browser_context.add_init_script(path="libs/stealth.min.js")
+        dy_crawler.context_page = await dy_crawler.browser_context.new_page()
+        await dy_crawler.context_page.goto(dy_crawler.index_url)
+        dy_crawler.dy_client = await dy_crawler.create_douyin_client(dy_httpx_proxy)
+        if not await dy_crawler.dy_client.ping(browser_context=dy_crawler.browser_context):
+            login_obj = DouYinLogin(
+                login_type=dy_crawler.login_type,
+                login_phone=dy_account_phone,
+                browser_context=dy_crawler.browser_context,
+                context_page=dy_crawler.context_page,
+                cookie_str=config.COOKIES
+            )
+            await login_obj.begin()
+            await dy_crawler.dy_client.update_cookies(browser_context=dy_crawler.browser_context)
 
         # search_posts
         # s=await crawler.dy_client.get_video_by_id(aweme_id="7211398361495211264")
@@ -87,6 +137,7 @@ async def main():
         # await crawler.search()
 
         utils.logger.info("Douyin Crawler finished ...")
+
         # block main crawler coroutine
         await asyncio.Event().wait()
 
@@ -109,7 +160,7 @@ async def handle_dyid(request):
     # await crawler.start()
     # s=await crawler.start2(name)
     try :
-        s=await crawler.dy_client.get_video_by_id(id)
+        s=await dy_crawler.dy_client.get_video_by_id(id)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success",s)
         # 转换为 JSON 字符串
@@ -141,7 +192,7 @@ async def handle_noteid(request):
     # await crawler.start()
     # s=await crawler.start2(name)
     try :
-        s=await crawler.xhs_client.get_note_by_id(id)
+        s=await xhs_crawler.xhs_client.get_note_by_id(id)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success",s)
         # 转换为 JSON 字符串
@@ -183,7 +234,7 @@ async def handle_keyword(request):
         print(response.to_dict())
         return web.json_response(response.to_dict())
     try :
-        s=await crawler.xhs_client.get_note_by_keyword(keyword=keyword,page=page,sort=field.SearchSortType.LATEST)
+        s=await xhs_crawler.xhs_client.get_note_by_keyword(keyword=keyword,page=page,sort=field.SearchSortType.LATEST)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success",s)
         # 转换为 JSON 字符串
@@ -215,9 +266,11 @@ if __name__ == '__main__':
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        asyncio.run(crawler.close())
+        asyncio.run(dy_crawler.close())
+        asyncio.run(xhs_crawler.close())
         sys.exit()
     except Exception as e:
         print(f"Unexpected error: {e}")
-        asyncio.run(crawler.close())
+        asyncio.run(dy_crawler.close())
+        asyncio.run(xhs_crawler.close())
         sys.exit()
