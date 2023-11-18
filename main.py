@@ -54,7 +54,7 @@ dy_account_phone, dy_playwright_proxy, dy_httpx_proxy = dy_crawler.create_proxy_
 xhs_crawler = CrawlerFactory().create_crawler(platform="xhs")
 xhs_crawler.init_config(
     platform="xhs",
-    login_type="cookie",
+    login_type="qrcode",
     account_pool=account_pool
 )
 xhs_account_phone, xhs_playwright_proxy, xhs_httpx_proxy = xhs_crawler.create_proxy_info()
