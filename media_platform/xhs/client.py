@@ -210,3 +210,12 @@ class XHSClient:
                     await asyncio.sleep(crawl_interval)
             await asyncio.sleep(crawl_interval)
         return result
+
+    async def comment_note(self, note_id: str, content: str):
+        """comment a note
+
+        :rtype: dict
+        """
+        uri = "/api/sns/web/v1/comment/post"
+        data = {"note_id": note_id, "content": content, "at_users": []}
+        return await self.post(uri, data)

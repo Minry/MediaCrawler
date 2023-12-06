@@ -259,6 +259,39 @@ async def handle_keyword(request):
         return web.json_response(response.to_dict())
 
 
+
+@routes.post("/note/comment")
+async def handle_noteid(request):
+    data = await request.json()
+    note_id = data.get('note_id')
+    content = data.get('content')
+    # await crawler.start()
+    # s=await crawler.start2(name)
+    try :
+        s=await xhs_crawler.xhs_client.comment_note(note_id,content)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsDataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsIPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
 app = web.Application()
 app.add_routes(routes)
 
