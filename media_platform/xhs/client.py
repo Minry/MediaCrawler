@@ -1,7 +1,11 @@
 import asyncio
 import json
+import time
+from datetime import datetime
+from enum import Enum
 from typing import Dict, Optional
 
+import aiofiles
 import httpx
 from playwright.async_api import BrowserContext, Page
 
@@ -11,6 +15,9 @@ from .exception import DataFetchError, IPBlockError
 from .field import SearchNoteType, SearchSortType
 from .help import get_search_id, sign
 
+class NoteType(Enum):
+    NORMAL = "normal"
+    VIDEO = "video"
 
 class XHSClient:
     def __init__(
@@ -58,13 +65,19 @@ class XHSClient:
                 method, url, timeout=self.timeout,
                 **kwargs
             )
-        data: Dict = response.json()
-        if data["success"]:
-            return data.get("data", data.get("success", {}))
-        elif data["code"] == self.IP_ERROR_CODE:
-            raise IPBlockError(self.IP_ERROR_STR)
-        else:
-            raise DataFetchError(data.get("msg", None))
+        try:
+            data: Dict = response.json()
+            if data["success"]:
+                return data.get("data", data.get("success", {}))
+            elif data["code"] == self.IP_ERROR_CODE:
+                raise IPBlockError(self.IP_ERROR_STR)
+            else:
+                raise DataFetchError(data.get("msg", None))
+        except Exception:
+            # 可以在这里处理或记录错误, 例如：
+            # logging.exception("Failed to decode JSON")
+            # 或者返回一个空的字典或其他默认值
+            return {}
 
     async def get(self, uri: str, params=None) -> Dict:
         final_uri = uri
@@ -74,11 +87,21 @@ class XHSClient:
         headers = await self._pre_headers(final_uri)
         return await self.request(method="GET", url=f"{self._host}{final_uri}", headers=headers)
 
-    async def post(self, uri: str, data: dict) -> Dict:
+    # async def post(self, uri: str, data: dict) -> Dict:
+    #     headers = await self._pre_headers(uri, data)
+    #     json_str = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+    #     return await self.request(method="POST", url=f"{self._host}{uri}",
+    #                               data=json_str, headers=headers)
+
+    async def post(self, uri: str, data: dict, **kwargs) -> Dict:
         headers = await self._pre_headers(uri, data)
-        json_str = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
-        return await self.request(method="POST", url=f"{self._host}{uri}",
-                                  data=json_str, headers=headers)
+        if 'headers' in kwargs:
+            headers.update(kwargs['headers'])
+        json_str = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        return await self.request(
+            method="POST", url=f"{self._host}{uri}", data=json_str.encode("utf-8"), headers=headers,
+            **{k: v for k, v in kwargs.items() if k != 'headers'}
+        )
 
     async def ping(self) -> bool:
         """get a note to check if login state is ok"""
@@ -219,3 +242,162 @@ class XHSClient:
         uri = "/api/sns/web/v1/comment/post"
         data = {"note_id": note_id, "content": content, "at_users": []}
         return await self.post(uri, data)
+
+    async def get_upload_files_permit(self, file_type: str, count: int = 1) -> tuple:
+        """获取文件上传的 id
+
+        :param file_type: 文件类型，["images", "video"]
+        :param count: 文件数量
+        :return:
+        """
+        uri = "/api/media/v1/upload/web/permit"
+        params = {
+            "biz_name": "spectrum",
+            "scene": file_type,
+            "file_count": count,
+            "version": "1",
+            "source": "web",
+        }
+        # temp_permit = await self.get(uri, params)["uploadTempPermits"][0]
+        response = await self.get(uri, params)
+        temp_permit = response["uploadTempPermits"][0]
+        file_id = temp_permit["fileIds"][0]
+        token = temp_permit["token"]
+        return file_id, token
+
+    async def upload_file(
+            self,
+            file_id: str,
+            token: str,
+            file_path: str,
+            content_type: str = "image/jpeg",
+    ):
+        """ 将文件上传至指定文件 id 处
+
+        :param file_id: 上传文件 id
+        :param token: 上传授权验证 token
+        :param file_path: 文件路径，暂只支持本地文件路径
+        :param content_type:  【"video/mp4","image/jpeg","image/png"】
+        :return:
+        """
+        url = "https://ros-upload.xiaohongshu.com/" + file_id
+        headers = {"X-Cos-Security-Token": token, "Content-Type": content_type}
+        async with aiofiles.open(file_path, "rb") as f:
+            data = await f.read()
+            return await self.request("PUT", url, data=data, headers=headers)
+        # with open(file_path, "rb") as f:
+        #     return await self.request("PUT", url, data=f, headers=headers)
+
+    async def get_suggest_topic(self, keyword=""):
+        """通过关键词获取话题信息，发布笔记用
+
+        :param keyword: 话题关键词，如 Python
+        :return:
+        """
+        uri = "/web_api/sns/v1/search/topic"
+        data = {
+            "keyword": keyword,
+            "suggest_topic_request": {"title": "", "desc": ""},
+            "page": {"page_size": 20, "page": 1},
+        }
+        response = await self.post(uri, data)
+        return response["topic_info_dtos"]
+
+    async def get_suggest_ats(self, keyword=""):
+        """通过关键词获取用户信息，发布笔记用
+
+        :param keyword: 用户名关键词，如 ReaJason
+        :return:
+        """
+        uri = "/web_api/sns/v1/search/user_info"
+        data = {
+            "keyword": keyword,
+            "search_id": str(time.time() * 1000),
+            "page": {"page_size": 20, "page": 1},
+        }
+        response = await self.post(uri, data)
+        return response["user_info_dtos"]
+
+    async def create_note(self, title, desc, note_type, ats: list = None, topics: list = None,
+                    image_info: dict = None,
+                    video_info: dict = None,
+                    post_time: str = None, is_private: bool = False):
+        if post_time:
+            post_date_time = datetime.strptime(post_time, "%Y-%m-%d %H:%M:%S")
+            post_time = round(int(post_date_time.timestamp()) * 1000)
+        uri = "/web_api/sns/v2/note"
+        business_binds = {
+            "version": 1,
+            "noteId": 0,
+            "noteOrderBind": {},
+            "notePostTiming": {
+                "postTime": post_time
+            },
+            "noteCollectionBind": {
+                "id": ""
+            }
+        }
+
+        data = {
+            "common": {
+                "type": note_type,
+                "title": title,
+                "note_id": "",
+                "desc": desc,
+                "source": '{"type":"web","ids":"","extraInfo":"{\\"subType\\":\\"official\\"}"}',
+                "business_binds": json.dumps(business_binds, separators=(",", ":")),
+                "ats": ats,
+                "hash_tag": topics,
+                "post_loc": {},
+                "privacy_info": {"op_type": 1, "type": int(is_private)},
+            },
+            "image_info": image_info,
+            "video_info": video_info,
+        }
+        headers = {
+            "Referer": "https://creator.xiaohongshu.com/"
+        }
+        print(data)
+        return await self.post(uri, data, headers=headers)
+
+    async def create_image_note(
+            self,
+            title,
+            desc,
+            files: list,
+            post_time: str = None,
+            ats: list = None,
+            topics: list = None,
+            is_private: bool = False,
+    ):
+        """发布图文笔记
+
+        :param title: 笔记标题
+        :param desc: 笔记详情
+        :param files: 文件路径列表，目前只支持本地路径
+        :param post_time: 可选，发布时间，例如 "2023-10-11 12:11:11"
+        :param ats: 可选，@用户信息
+        :param topics: 可选，话题信息
+        :param is_private: 可选，是否私密发布
+        :return:
+        """
+        if ats is None:
+            ats = []
+        if topics is None:
+            topics = []
+
+        images = []
+        for file in files:
+            image_id, token = await self.get_upload_files_permit("image")
+            await self.upload_file(image_id, token, file)
+            images.append(
+                {
+                    "file_id": image_id,
+                    "metadata": {"source": -1},
+                    "stickers": {"version": 2, "floating": []},
+                    "extra_info_json": '{"mimeType":"image/jpeg"}',
+                }
+            )
+        return await self.create_note(title, desc, NoteType.NORMAL.value, ats=ats, topics=topics,
+                                image_info={"images": images}, is_private=is_private,
+                                post_time=post_time)

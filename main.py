@@ -260,8 +260,8 @@ async def handle_keyword(request):
 
 
 
-@routes.post("/note/comment")
-async def handle_noteid(request):
+@routes.post("/notes/comment")
+async def comment_note(request):
     data = await request.json()
     note_id = data.get('note_id')
     content = data.get('content')
@@ -291,6 +291,82 @@ async def handle_noteid(request):
         # 转换为 JSON 字符串
         print(response.to_dict())
         return web.json_response(response.to_dict())
+
+
+
+@routes.post("/notes/img/create")
+async def create_img_note(request):
+    data = await request.json()
+    title = data.get('title')
+    desc = data.get('desc')
+    images = data.get('images')
+    is_private = data.get('is_private')
+    # 没有找到键值时默认就会返回 None
+    post_time = data.get('post_time')
+
+    try:
+        s = await xhs_crawler.xhs_client.create_image_note(title, desc, images, is_private=is_private, post_time=post_time)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success", s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsDataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsIPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
+
+
+@routes.get("/notes/topic")
+async def get_note_topic(request):
+    # 获取查询参数，request.query是一个MultiDictProxy对象，我们可以向字典一样操作它
+    params = request.query
+    keyword = params.get("keyword")  # 使用get方法，如果不存在该key值，会返回None
+    if keyword is None:
+        response = ResponseObject(3, "参数非法")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    try :
+        s=await xhs_crawler.xhs_client.get_suggest_topic(keyword)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsDataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsIPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
+
 
 app = web.Application()
 app.add_routes(routes)
