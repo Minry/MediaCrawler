@@ -77,7 +77,7 @@ class XHSClient:
             # 可以在这里处理或记录错误, 例如：
             # logging.exception("Failed to decode JSON")
             # 或者返回一个空的字典或其他默认值
-            return {}
+            raise
 
     async def get(self, uri: str, params=None) -> Dict:
         final_uri = uri
@@ -284,7 +284,10 @@ class XHSClient:
         headers = {"X-Cos-Security-Token": token, "Content-Type": content_type}
         async with aiofiles.open(file_path, "rb") as f:
             data = await f.read()
-            return await self.request("PUT", url, data=data, headers=headers)
+            try:
+                return await self.request("PUT", url, data=data, headers=headers)
+            except Exception:
+                return {}
         # with open(file_path, "rb") as f:
         #     return await self.request("PUT", url, data=f, headers=headers)
 

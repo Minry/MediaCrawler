@@ -300,12 +300,32 @@ async def create_img_note(request):
     title = data.get('title')
     desc = data.get('desc')
     images = data.get('images')
-    is_private = data.get('is_private')
-    # 没有找到键值时默认就会返回 None
-    post_time = data.get('post_time')
 
+    if title is None or title.strip() == '':
+        response = ResponseObject(3, f"发布笔记的标题不得为空")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    # 暂时不知道笔记内容能不能为空,暂时设为不得为空
+    if desc is None or desc.strip() == '':
+        response = ResponseObject(3, f"笔记内容不得为空")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    # 发布图文笔记,必须要有图片
+    if images is None or not isinstance(images, list) or len(images) == 0:
+        response = ResponseObject(3, "图片数量不得为0")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    if any(not i or not isinstance(i, str) or i.strip() == '' for i in images):
+        response = ResponseObject(3, "所有的图片路径都不得为空或空串")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    is_private = data.get('is_private', False)
+    # 没有找到键值时默认就会返回 None，时间格式为2023-07-25 23:59:59
+    post_time = data.get('post_time')
+    ats=data.get('ats')
+    topics=data.get('topics')
     try:
-        s = await xhs_crawler.xhs_client.create_image_note(title, desc, images, is_private=is_private, post_time=post_time)
+        s = await xhs_crawler.xhs_client.create_image_note(title, desc, images, is_private=is_private, post_time=post_time,ats=ats,topics=topics)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success", s)
         # 转换为 JSON 字符串
@@ -343,6 +363,42 @@ async def get_note_topic(request):
         return web.json_response(response.to_dict())
     try :
         s=await xhs_crawler.xhs_client.get_suggest_topic(keyword)
+        # 创建 ResponseObject 对象
+        response = ResponseObject(0, "Success",s)
+        # 转换为 JSON 字符串
+        # json_str = json.dumps(response.__dict__)
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsDataFetchError as e:
+        response = ResponseObject(1,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except XhsIPBlockError as e:
+        response = ResponseObject(2,f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    except Exception as e :
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+
+
+@routes.get("/notes/at")
+async def get_note_at(request):
+    # 获取查询参数，request.query是一个MultiDictProxy对象，我们可以向字典一样操作它
+    params = request.query
+    keyword = params.get("keyword")  # 使用get方法，如果不存在该key值，会返回None
+    if keyword is None:
+        response = ResponseObject(3, "参数非法")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    try :
+        s=await xhs_crawler.xhs_client.get_suggest_ats(keyword)
         # 创建 ResponseObject 对象
         response = ResponseObject(0, "Success",s)
         # 转换为 JSON 字符串
