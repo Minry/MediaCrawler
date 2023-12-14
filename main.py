@@ -26,8 +26,8 @@ import time
 
 xhs_creator_info = None
 dy_creator_info = None
-xhs_creator_context :BrowserContext
-dy_creator_context :BrowserContext
+xhs_creator_context: BrowserContext
+dy_creator_context: BrowserContext
 routes = web.RouteTableDef()
 
 
@@ -81,6 +81,7 @@ xhs_crawler.init_config(
 )
 xhs_account_phone, xhs_playwright_proxy, xhs_httpx_proxy = xhs_crawler.create_proxy_info()
 
+
 # 判断小红书创作平台的cookie是否有效
 async def xhs_creator_cookie_auth(xhs_creator_path):
     async with async_playwright() as playwright:
@@ -110,6 +111,7 @@ async def xhs_creator_cookie_auth(xhs_creator_path):
         finally:
             await page.close()
             await xhs_playwright_contex.close()
+
 
 # 生成小红书创作中心cookie
 async def xhs_creator_cookie_gen(xhs_creator_path):
@@ -162,6 +164,7 @@ async def dy_creator_cookie_auth(dy_creator_path):
             await page.close()
             await dy_playwright_contex.close()
 
+
 # 生成小抖音创作中心cookie
 async def dy_creator_cookie_gen(dy_creator_path):
     async with async_playwright() as playwright:
@@ -182,7 +185,6 @@ async def dy_creator_cookie_gen(dy_creator_path):
         # 点击调试器的继续，保存cookie
         await page.close()
         await xhs_playwright_contex.close()
-
 
 
 async def main():
@@ -217,7 +219,8 @@ async def main():
         # Create a client to interact with the xiaohongshu website.
         time.sleep(3)
         xhs_crawler.xhs_client = await xhs_crawler.create_xhs_client(xhs_httpx_proxy)
-        if (xhs_crawler.platform == "xhs" and xhs_crawler.login_type == "cookie") or not await xhs_crawler.xhs_client.ping():
+        if (
+                xhs_crawler.platform == "xhs" and xhs_crawler.login_type == "cookie") or not await xhs_crawler.xhs_client.ping():
             login_obj = XHSLogin(
                 login_type=xhs_crawler.login_type,
                 login_phone=xhs_account_phone,
@@ -274,7 +277,7 @@ async def main():
 
         # 为playwright操作抖音页面专门创建一个context
         dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                            config.USER_DATA_DIR % "dy_creator")
+                                           config.USER_DATA_DIR % "dy_creator")
         if not os.path.exists(dy_creator_data_dir) or not await dy_creator_cookie_auth(dy_creator_data_dir):
             await dy_creator_cookie_gen(dy_creator_data_dir)
         global dy_creator_context
@@ -657,6 +660,47 @@ async def handle_keyword(request):
         # 转换为 JSON 字符串
         print(response.to_dict())
         return web.json_response(response.to_dict())
+
+
+@routes.get("/xhs/img/none/wm")
+async def xhs_no_wm_img(request):
+    # 获取查询参数，request.query是一个MultiDictProxy对象，我们可以向字典一样操作它
+    params = request.query
+    link = params.get("link")  # 使用get方法，如果不存在该key值，会返回None
+    if link is None:
+        response = ResponseObject(3, "参数非法")
+        # 转换为 JSON 字符串
+        print(response.to_dict())
+        return web.json_response(response.to_dict())
+    page = await xhs_creator_context.new_page()
+    # 定义要监听的域名
+    target_domain = 'sns-webpic-qc.xhscdn.com'
+    # 存储拦截到的URL的数组
+    intercepted_urls = []
+
+    # 监听页面的所有响应
+    def response_handler(response):
+        url = response.url
+        # 检查响应的 URL 是否包含目标域名
+        if target_domain in url:
+            # 在这里可以处理符合条件的响应，比如获取内容、存储数据等操作
+            # 将URL添加到数组中
+            intercepted_urls.append(url)
+
+    page.on('response', response_handler)
+    try:
+        await page.goto(link, timeout=18000)
+        await page.wait_for_timeout(10000)
+        response = ResponseObject(0, "Success", intercepted_urls)
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    except Exception as e:
+        # print(f"Unexpected error: {e}")
+        response = ResponseObject(3, f"{e}")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    finally:
+        await page.close()
 
 
 @routes.post("/notes/comment")

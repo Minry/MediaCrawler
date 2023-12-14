@@ -188,61 +188,64 @@ async def test_example3() -> None:
         context = await browser.new_context()  # Pass any options
         # Pause the page, and start recording manually.
         page = await context.new_page()
-        page.on('response', on_response2)
-        await page.goto("https://www.baidu.com/")
-        await page.wait_for_url('https://www.baidu.com/')
-        await page.type('#kw',"你好")
-        await page.wait_for_timeout(1000)
-        await page.keyboard.type("")
-        await page.wait_for_timeout(1000)
-        await page.type('#kw',"啊啊啊")
-        await page.wait_for_timeout(1000)
-        await page.type('#kw',"哈哈哈")
-        await page.pause()
-        await page.wait_for_load_state('networkidle', timeout=8000)
-        page.remove_listener("response", on_response2)
-        # s=a
-        print("获取到的a的值为:", a)
+        # 定义要监听的域名
+        target_domain = 'sns-webpic-qc.xhscdn.com'
+        # 存储拦截到的URL的数组
+        intercepted_urls = []
+        # 监听页面的所有响应
+        def response_handler(response):
+            url = response.url
+            # 检查响应的 URL 是否包含目标域名
+            if target_domain in url:
+                print(f'Response URL: {url}')
+                # 在这里可以处理符合条件的响应，比如获取内容、存储数据等操作
+                # 将URL添加到数组中
+                intercepted_urls.append(url)
 
+        page.on('response', response_handler)
+        await page.goto("http://xhslink.com/21sGtx", timeout=18000)
+        await page.wait_for_timeout(10000)
+        s = a
+        print("获取到的a的值为:", a)
 
 
 async def test_example4() -> None:
     async with async_playwright() as playwright:
         # Make sure to run headed.
-        browser =  playwright.chromium
+        browser = playwright.chromium
         # Setup context however you like.
         xhs_creator_context = await browser.launch_persistent_context(
             user_data_dir="C:\\study\\python\\MediaCrawler\\browser_data\\xhs_creator_user_data_dir",
             headless=False,
-        )# Pass any options
+        )  # Pass any options
         # Pause the page, and start recording manually.
         page = await xhs_creator_context.new_page()
         page.set_default_timeout(180000)
         page.on('response', on_response)
         await page.goto("https://creator.xiaohongshu.com/creator/notemanage")
-        await page.wait_for_url("https://creator.xiaohongshu.com/creator/notemanage",timeout=30000)
+        await page.wait_for_url("https://creator.xiaohongshu.com/creator/notemanage", timeout=30000)
         await page.wait_for_timeout(15000)
         page.remove_listener("response", on_response)
-        s=xhs_creator_info
+        s = xhs_creator_info
         print("获取到的a的值为:", s)
 
 
 async def test_example5() -> None:
     async with async_playwright() as playwright:
         # Make sure to run headed.
-        browser =  playwright.chromium
+        browser = playwright.chromium
         # Setup context however you like.
         dy_creator_context = await browser.launch_persistent_context(
             user_data_dir="C:\\study\\python\\MediaCrawler\\browser_data\\dy_creator_user_data_dir",
             headless=False,
-        )# Pass any options
+        )  # Pass any options
         # Pause the page, and start recording manually.
         page = await dy_creator_context.new_page()
         page.set_default_timeout(180000)
         page.on('response', on_response)
         await page.goto("https://creator.douyin.com/creator-micro/content/manage")
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",timeout=30000)
+        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage", timeout=30000)
         await page.wait_for_timeout(15000)
         page.remove_listener("response", on_response)
-        s=dy_creator_info
+        s = dy_creator_info
         print("获取到的a的值为:", s)
