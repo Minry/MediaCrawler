@@ -469,6 +469,12 @@ async def create_dy_img(request):
         await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
                                 timeout=30000)  # 如果自动跳转到作品页面，则代表发布成功
         await page.wait_for_timeout(20000)
+        # 总是拿不到拦截请求的数据,因此重新访问一次
+        await page.goto("https://creator.douyin.com/creator-micro/content/manage",
+                                timeout=30000)
+        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
+                                timeout=30000)
+        await page.wait_for_timeout(20000)
         response = ResponseObject(0, "Success", dy_creator_info)
         return web.json_response(response.to_dict())
     except Exception as e:
