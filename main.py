@@ -27,7 +27,6 @@ import time
 xhs_creator_info = None
 dy_creator_info = None
 xhs_creator_context: BrowserContext
-dy_creator_context: BrowserContext
 routes = web.RouteTableDef()
 
 
@@ -280,11 +279,6 @@ async def main():
                                            config.USER_DATA_DIR % "dy_creator")
         if not os.path.exists(dy_creator_data_dir) or not await dy_creator_cookie_auth(dy_creator_data_dir):
             await dy_creator_cookie_gen(dy_creator_data_dir)
-        global dy_creator_context
-        dy_creator_context = await chromium.launch_persistent_context(
-            user_data_dir=dy_creator_data_dir,
-            headless=True,
-        )
         # block main crawler coroutine
         await asyncio.Event().wait()
 
@@ -380,108 +374,119 @@ async def create_dy_img(request):
         # 转换为 JSON 字符串
         return web.json_response(response.to_dict())
     desc_lines = desc.split('\n')
-    page = await dy_creator_context.new_page()
-    page.set_default_timeout(180000)
-    # images = [
-    #     "C:\\study\\files\\genImg\\10.jpg",
-    #     "C:\\study\\files\\genImg\\11.jpg",
-    #     "C:\\study\\files\\genImg\\12.jpg",
-    # ]
-    # title="背景真不错"
-    # desc = "很好看的背景图\n你值得拥有\n哈哈"
-    # desc_lines = desc.split('\n')
-    # topics=["租房","转租"]
-    try:
-        await page.goto("https://creator.douyin.com/creator-micro/content/upload")
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload")
-        await page.locator('//div[text()="发布图文"]').click()
-        await page.wait_for_timeout(100)
-        async with page.expect_file_chooser() as fc_info:
-            await page.locator('//div[contains(@class, "container--157qa")]').click()  # 点击上传附件按钮
-            await page.wait_for_timeout(500)
-            file_chooser = await fc_info.value
-            await file_chooser.set_files(images)
-        await page.wait_for_url(
-            "https://creator.douyin.com/creator-micro/content/publish-media/image-text?enter_from=publish_page")
-        # 等待图片上传结束
-        await page.wait_for_timeout(10000)
-        await page.fill('input[placeholder="添加作品标题"]', title)
-        await page.wait_for_timeout(1000)
-        await page.locator(".zone-container").click()
-        for index, item in enumerate(desc_lines):
-            if index != 0:
-                await page.keyboard.press("Enter")
-            await page.keyboard.type(item)
-        await page.keyboard.press("Enter")
-        for tag in topics:
-            await page.type(".zone-container", "#" + tag)
-            await page.press(".zone-container", "Space")
+    async with async_playwright() as playwright:
+        # launch browser and create single browser context
+        chromium = playwright.chromium
+        dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+                                           config.USER_DATA_DIR % "dy_creator")
+        dy_creator_context = await chromium.launch_persistent_context(
+            user_data_dir=dy_creator_data_dir,
+            headless=True,
+        )
+        page = await dy_creator_context.new_page()
+        page.set_default_timeout(180000)
+        # images = [
+        #     "C:\\study\\files\\genImg\\10.jpg",
+        #     "C:\\study\\files\\genImg\\11.jpg",
+        #     "C:\\study\\files\\genImg\\12.jpg",
+        # ]
+        # title="背景真不错"
+        # desc = "很好看的背景图\n你值得拥有\n哈哈"
+        # desc_lines = desc.split('\n')
+        # topics=["租房","转租"]
+        try:
+            await page.goto("https://creator.douyin.com/creator-micro/content/upload")
+            await page.wait_for_url("https://creator.douyin.com/creator-micro/content/upload")
+            await page.locator('//div[text()="发布图文"]').click()
+            await page.wait_for_timeout(100)
+            async with page.expect_file_chooser() as fc_info:
+                await page.locator('//div[contains(@class, "container--157qa")]').click()  # 点击上传附件按钮
+                await page.wait_for_timeout(500)
+                file_chooser = await fc_info.value
+                await file_chooser.set_files(images)
+            await page.wait_for_url(
+                "https://creator.douyin.com/creator-micro/content/publish-media/image-text?enter_from=publish_page")
+            # 等待图片上传结束
+            await page.wait_for_timeout(10000)
+            await page.fill('input[placeholder="添加作品标题"]', title)
+            await page.wait_for_timeout(1000)
+            await page.locator(".zone-container").click()
+            for index, item in enumerate(desc_lines):
+                if index != 0:
+                    await page.keyboard.press("Enter")
+                await page.keyboard.type(item)
+            await page.keyboard.press("Enter")
+            for tag in topics:
+                await page.type(".zone-container", "#" + tag)
+                await page.press(".zone-container", "Space")
 
-        # await page.keyboard.type("很好看的背景图")
-        # await page.keyboard.press("Enter")
-        # await page.keyboard.type("你值得拥有")
-        # await page.type(".zone-container", "#" + "背景图")
-        # await page.press(".zone-container", "Space")
-        await page.locator('//span[text()="选择音乐"]').click()
-        await page.wait_for_timeout(2000)
-        await page.fill('input[placeholder="搜索音乐"]', music_theme)
-        await page.wait_for_timeout(2000)
-        button_locator = page.locator('//button/span[text()="使用"]')
-        music_amount = await button_locator.count()
-        if music_amount > 0:
-            # 获取第一个元素并点击
-            await button_locator.nth(random.randint(0, music_amount - 1)).click()
-        else:
-            # 执行一次 选择乡村音乐
-            await page.fill('input[placeholder="搜索音乐"]', "乡村音乐")
+            # await page.keyboard.type("很好看的背景图")
+            # await page.keyboard.press("Enter")
+            # await page.keyboard.type("你值得拥有")
+            # await page.type(".zone-container", "#" + "背景图")
+            # await page.press(".zone-container", "Space")
+            await page.locator('//span[text()="选择音乐"]').click()
+            await page.wait_for_timeout(2000)
+            await page.fill('input[placeholder="搜索音乐"]', music_theme)
             await page.wait_for_timeout(2000)
             button_locator = page.locator('//button/span[text()="使用"]')
-            music_amount2 = await button_locator.count()
-            if music_amount2 > 0:
+            music_amount = await button_locator.count()
+            if music_amount > 0:
                 # 获取第一个元素并点击
-                await button_locator.nth(random.randint(0, music_amount2 - 1)).click()
-        await page.wait_for_timeout(2000)
-        # await page.locator('//span[text()="输入相关位置，让更多人看到你的作品"]').click()
-        await page.click('div.semi-select-selection >> text="输入相关位置，让更多人看到你的作品"')
-        await page.wait_for_timeout(2000)
-        await page.keyboard.press("Backspace")
-        await page.keyboard.press("Control+KeyA")
-        await page.keyboard.press("Delete")
-        await page.keyboard.type(position)
-        await page.wait_for_timeout(2000)
-        position_options = page.locator('div[role="listbox"] [role="option"]')
-        if await position_options.count() > 0:
-            await position_options.first.click()
-        else:
+                await button_locator.nth(random.randint(0, music_amount - 1)).click()
+            else:
+                # 执行一次 选择乡村音乐
+                await page.fill('input[placeholder="搜索音乐"]', "乡村音乐")
+                await page.wait_for_timeout(2000)
+                button_locator = page.locator('//button/span[text()="使用"]')
+                music_amount2 = await button_locator.count()
+                if music_amount2 > 0:
+                    # 获取第一个元素并点击
+                    await button_locator.nth(random.randint(0, music_amount2 - 1)).click()
+            await page.wait_for_timeout(2000)
+            # await page.locator('//span[text()="输入相关位置，让更多人看到你的作品"]').click()
+            await page.click('div.semi-select-selection >> text="输入相关位置，让更多人看到你的作品"')
+            await page.wait_for_timeout(2000)
             await page.keyboard.press("Backspace")
             await page.keyboard.press("Control+KeyA")
             await page.keyboard.press("Delete")
-            await page.keyboard.type("武汉")
+            await page.keyboard.type(position)
             await page.wait_for_timeout(2000)
-            position_options2 = page.locator('div[role="listbox"] [role="option"]')
-            if await position_options2.count() > 0:
-                await position_options2.first.click()
-        # 判断图文是否发布成功
-        page.on('response', on_response)
-        publish_button = page.get_by_role('button', name="发布", exact=True)
-        if await publish_button.count():
-            await publish_button.click()
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
-                                timeout=30000)  # 如果自动跳转到作品页面，则代表发布成功
-        await page.wait_for_timeout(20000)
-        # 总是拿不到拦截请求的数据,因此重新访问一次
-        await page.goto("https://creator.douyin.com/creator-micro/content/manage",
-                                timeout=30000)
-        await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
-                                timeout=30000)
-        await page.wait_for_timeout(20000)
-        response = ResponseObject(0, "Success", dy_creator_info)
-        return web.json_response(response.to_dict())
-    except Exception as e:
-        response = ResponseObject(3, f"{e}")
-        return web.json_response(response.to_dict())
-    finally:
-        await page.close()
+            position_options = page.locator('div[role="listbox"] [role="option"]')
+            if await position_options.count() > 0:
+                await position_options.first.click()
+            else:
+                await page.keyboard.press("Backspace")
+                await page.keyboard.press("Control+KeyA")
+                await page.keyboard.press("Delete")
+                await page.keyboard.type("武汉")
+                await page.wait_for_timeout(2000)
+                position_options2 = page.locator('div[role="listbox"] [role="option"]')
+                if await position_options2.count() > 0:
+                    await position_options2.first.click()
+            # 判断图文是否发布成功
+            page.on('response', on_response)
+            publish_button = page.get_by_role('button', name="发布", exact=True)
+            if await publish_button.count():
+                await publish_button.click()
+            await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
+                                    timeout=30000)  # 如果自动跳转到作品页面，则代表发布成功
+            await page.wait_for_timeout(20000)
+            # 总是拿不到拦截请求的数据,因此重新访问一次
+            await page.goto("https://creator.douyin.com/creator-micro/content/manage",
+                                    timeout=30000)
+            await page.wait_for_url("https://creator.douyin.com/creator-micro/content/manage",
+                                    timeout=30000)
+            await page.wait_for_timeout(20000)
+            response = ResponseObject(0, "Success", dy_creator_info)
+            return web.json_response(response.to_dict())
+        except Exception as e:
+            response = ResponseObject(3, f"{e}")
+            return web.json_response(response.to_dict())
+        finally:
+            await page.close()
+            await dy_creator_context.close()
+
 
 
 @routes.post("/create/xhs/img")
