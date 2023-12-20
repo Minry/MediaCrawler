@@ -26,7 +26,6 @@ import time
 
 xhs_creator_info = None
 dy_creator_info = None
-xhs_creator_context: BrowserContext
 routes = web.RouteTableDef()
 
 
@@ -239,12 +238,6 @@ async def main():
                                             config.USER_DATA_DIR % "xhs_creator")
         if not os.path.exists(xhs_creator_data_dir) or not await xhs_creator_cookie_auth(xhs_creator_data_dir):
             await xhs_creator_cookie_gen(xhs_creator_data_dir)
-        # type: ignore
-        global xhs_creator_context
-        xhs_creator_context = await chromium.launch_persistent_context(
-            user_data_dir=xhs_creator_data_dir,
-            headless=True,
-        )
 
         dy_crawler.browser_context = await dy_crawler.launch_browser(
             chromium,
@@ -529,74 +522,85 @@ async def create_xhs_img(request):
         # 转换为 JSON 字符串
         return web.json_response(response.to_dict())
     desc_lines = desc.split('\n')
-    page = await xhs_creator_context.new_page()
-    page.set_default_timeout(180000)
-    # images = [
-    #     "C:\\study\\files\\genImg\\10.jpg",
-    #     "C:\\study\\files\\genImg\\11.jpg",
-    #     "C:\\study\\files\\genImg\\12.jpg",
-    # ]
-    # title="背景真不错"
-    # desc = "很好看的背景图\n你值得拥有\n哈哈"
-    # desc_lines = desc.split('\n')
-    # topics=["租房","转租"]
-    try:
-        await page.goto("https://creator.xiaohongshu.com/publish/publish")
-        await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish")
-        await page.get_by_text("上传图文").click()
-        await page.wait_for_timeout(100)
-        await page.locator('div.upload-container input.upload-input').set_input_files(images)
-        await page.wait_for_timeout(10000)
-        # input_locator = page.locator('.c-input_inner')
-        # if await input_locator.count() == 0:
-        #     print("页面变化失败")
-        #     return
-        await page.locator('.c-input_inner').fill(title)
-        await page.wait_for_timeout(100)
-        await page.locator('#post-textarea').click()
-        await page.wait_for_timeout(100)
-        for index, item in enumerate(desc_lines):
-            if index != 0:
-                await page.keyboard.press("Enter")
-            await page.keyboard.type(item)
-        await page.keyboard.press("Enter")
-        for tag in topics:
-            await page.keyboard.press("Space")
-            await page.keyboard.type("#" + tag)
+
+    async with async_playwright() as playwright:
+        # launch browser and create single browser context
+        chromium = playwright.chromium
+        xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+                                            config.USER_DATA_DIR % "xhs_creator")
+        xhs_creator_context = await chromium.launch_persistent_context(
+            user_data_dir=xhs_creator_data_dir,
+            headless=True,
+        )
+        page = await xhs_creator_context.new_page()
+        page.set_default_timeout(180000)
+        # images = [
+        #     "C:\\study\\files\\genImg\\10.jpg",
+        #     "C:\\study\\files\\genImg\\11.jpg",
+        #     "C:\\study\\files\\genImg\\12.jpg",
+        # ]
+        # title="背景真不错"
+        # desc = "很好看的背景图\n你值得拥有\n哈哈"
+        # desc_lines = desc.split('\n')
+        # topics=["租房","转租"]
+        try:
+            await page.goto("https://creator.xiaohongshu.com/publish/publish")
+            await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish")
+            await page.get_by_text("上传图文").click()
+            await page.wait_for_timeout(100)
+            await page.locator('div.upload-container input.upload-input').set_input_files(images)
+            await page.wait_for_timeout(10000)
+            # input_locator = page.locator('.c-input_inner')
+            # if await input_locator.count() == 0:
+            #     print("页面变化失败")
+            #     return
+            await page.locator('.c-input_inner').fill(title)
+            await page.wait_for_timeout(100)
+            await page.locator('#post-textarea').click()
+            await page.wait_for_timeout(100)
+            for index, item in enumerate(desc_lines):
+                if index != 0:
+                    await page.keyboard.press("Enter")
+                await page.keyboard.type(item)
+            await page.keyboard.press("Enter")
+            for tag in topics:
+                await page.keyboard.press("Space")
+                await page.keyboard.type("#" + tag)
+                await page.wait_for_timeout(2000)
+                li_locator = page.locator('li.publish-highlight')
+                if await li_locator.count():
+                    await li_locator.click()
+                    await page.wait_for_timeout(100)
+            await page.locator('.single-input[type="text"]').click()
+            await page.locator('.single-input[type="text"]').click()
+            await page.wait_for_timeout(100)
+            await page.locator('.single-input[type="text"]').fill(position)
             await page.wait_for_timeout(2000)
-            li_locator = page.locator('li.publish-highlight')
-            if await li_locator.count():
-                await li_locator.click()
-                await page.wait_for_timeout(100)
-        await page.locator('.single-input[type="text"]').click()
-        await page.locator('.single-input[type="text"]').click()
-        await page.wait_for_timeout(100)
-        await page.locator('.single-input[type="text"]').fill(position)
-        await page.wait_for_timeout(2000)
-        ul_locator = page.locator('ul.dropdown')
-        # 检查 ul 是否存在
-        if await ul_locator.count():
-            # 选择第一个 li 元素并点击
-            await page.locator('ul.dropdown li').nth(0).click()
-        else:
-            await page.locator('.single-input[type="text"]').fill("武汉")
-            await page.wait_for_timeout(2000)
-            ul_locator2 = page.locator('ul.dropdown')
-            if await ul_locator2.count():
+            ul_locator = page.locator('ul.dropdown')
+            # 检查 ul 是否存在
+            if await ul_locator.count():
+                # 选择第一个 li 元素并点击
                 await page.locator('ul.dropdown li').nth(0).click()
-        await page.locator('.publishBtn').click()
-        await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish", timeout=15000)
-        page.on('response', on_response)
-        await page.goto('https://creator.xiaohongshu.com/creator/notemanage', timeout=30000)
-        await page.wait_for_url("https://creator.xiaohongshu.com/creator/notemanage", timeout=30000)
-        await page.wait_for_timeout(15000)
-        response = ResponseObject(0, "Success", xhs_creator_info)
-        return web.json_response(response.to_dict())
-    except Exception as e:
-        response = ResponseObject(3, f"{e}")
-        return web.json_response(response.to_dict())
-    finally:
-        await page.close()
+            else:
+                await page.locator('.single-input[type="text"]').fill("武汉")
+                await page.wait_for_timeout(2000)
+                ul_locator2 = page.locator('ul.dropdown')
+                if await ul_locator2.count():
+                    await page.locator('ul.dropdown li').nth(0).click()
+            await page.locator('.publishBtn').click()
+            await page.wait_for_url("https://creator.xiaohongshu.com/publish/publish", timeout=15000)
+            page.on('response', on_response)
+            await page.goto('https://creator.xiaohongshu.com/creator/notemanage', timeout=30000)
+            await page.wait_for_url("https://creator.xiaohongshu.com/creator/notemanage", timeout=30000)
+            await page.wait_for_timeout(15000)
+            response = ResponseObject(0, "Success", xhs_creator_info)
+            return web.json_response(response.to_dict())
+        except Exception as e:
+            response = ResponseObject(3, f"{e}")
+            return web.json_response(response.to_dict())
+        finally:
+            await page.close()
+            await xhs_creator_context.close()
 
 
 @routes.get("/note/{id}")
@@ -683,35 +687,45 @@ async def xhs_no_wm_img(request):
         # 转换为 JSON 字符串
         print(response.to_dict())
         return web.json_response(response.to_dict())
-    page = await xhs_creator_context.new_page()
-    # 定义要监听的域名
-    target_domain = 'sns-webpic-qc.xhscdn.com'
-    # 存储拦截到的URL的数组
-    intercepted_urls = []
 
-    # 监听页面的所有响应
-    def response_handler(response):
-        url = response.url
-        # 检查响应的 URL 是否包含目标域名
-        if target_domain in url:
-            # 在这里可以处理符合条件的响应，比如获取内容、存储数据等操作
-            # 将URL添加到数组中
-            intercepted_urls.append(url)
+    async with async_playwright() as playwright:
+        options = {
+            'headless': True
+        }
+        # Make sure to run headed.
+        browser = await playwright.chromium.launch(**options)
+        # Setup context however you like.
+        context = await browser.new_context()
 
-    page.on('response', response_handler)
-    try:
-        await page.goto(link, timeout=18000)
-        await page.wait_for_timeout(10000)
-        response = ResponseObject(0, "Success", intercepted_urls)
-        # 转换为 JSON 字符串
-        return web.json_response(response.to_dict())
-    except Exception as e:
-        # print(f"Unexpected error: {e}")
-        response = ResponseObject(3, f"{e}")
-        # 转换为 JSON 字符串
-        return web.json_response(response.to_dict())
-    finally:
-        await page.close()
+        page = await context.new_page()
+        # 定义要监听的域名
+        target_domain = 'sns-webpic-qc.xhscdn.com'
+        # 存储拦截到的URL的数组
+        intercepted_urls = []
+        # 监听页面的所有响应
+        def response_handler(response):
+            url = response.url
+            # 检查响应的 URL 是否包含目标域名
+            if target_domain in url:
+                # 在这里可以处理符合条件的响应，比如获取内容、存储数据等操作
+                # 将URL添加到数组中
+                intercepted_urls.append(url)
+
+        page.on('response', response_handler)
+        try:
+            await page.goto(link, timeout=18000)
+            await page.wait_for_timeout(10000)
+            response = ResponseObject(0, "Success", intercepted_urls)
+            # 转换为 JSON 字符串
+            return web.json_response(response.to_dict())
+        except Exception as e:
+            # print(f"Unexpected error: {e}")
+            response = ResponseObject(3, f"{e}")
+            # 转换为 JSON 字符串
+            return web.json_response(response.to_dict())
+        finally:
+            await page.close()
+            await context.close()
 
 
 @routes.post("/notes/comment")

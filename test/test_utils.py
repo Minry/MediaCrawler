@@ -51,16 +51,11 @@ async def test_example2() -> None:
         )
         page = await dy_playwright_contex.new_page()
         page.set_default_timeout(180000)
-        images = ["C:\\study\\files\\genImg\\publish\\640_960\\2023-12-18\\382.png",
-                  "C:\\study\\files\\origin_media\\2023-12-18\\382\\0.jpg",
-                  "C:\\study\\files\\origin_media\\2023-12-18\\382\\1.jpg",
-                  "C:\\study\\files\\origin_media\\2023-12-18\\382\\2.jpg",
-                  "C:\\study\\files\\origin_media\\2023-12-18\\382\\3.jpg",
-                  "C:\\study\\files\\origin_media\\2023-12-18\\382\\4.jpg"]
-        title = "【转租群】汤逊湖山庄三室一厅急转"
-        position = "汤逊湖山庄帝景阁A栋"
-        music_theme = "乡村"
-        desc = "【租他人之急，转你我之需】\n\n转租【汤逊湖山庄帝景阁A栋】的三居室。\n\n位置在武汉市江夏区江夏大道7号。\n\n之前的租期签到了24年8月24号，不可以短租。\n\n因个人工作原因急需转租位置在江夏区庙山这里，离武昌理工学院很近，整租三室一厅，房子差不多90平，洗衣机电视机空调都有，晾衣服也很方便，密码锁"
+        images = ["C:\\study\\files\\genImg\\publish\\640_960\\2023-12-19\\386.png"]
+        title = "【转租群】三室一厅次卧一口价"
+        position = "武汉美的·君兰半岛"
+        music_theme = "粤语"
+        desc = "【租他人之急，转你我之需】\n\n转租【美的·君兰半岛】的次卧。\n\n位置在武汉市江夏区黄家湖大道地铁8号线。\n\n之前的租期签到了25年12月17号，可以短租。\n\n一口价房租 包水电燃气网络物业费 提供洗发水沐浴露护发素牙膏洗衣液洗手液垃圾袋 全屋软水 即热饮水机 洗烘一体洗衣机 2w冰箱 3k吹风机 家电齐全 拎包入住"
         desc_lines = desc.split('\n')
         topics = ["租房", "转租","武汉租房"]
         try:
