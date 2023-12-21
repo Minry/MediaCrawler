@@ -429,7 +429,7 @@ async def create_dy_img(request):
                 await button_locator.nth(random.randint(0, music_amount - 1)).click()
             else:
                 # 执行一次 选择乡村音乐
-                await page.fill('input[placeholder="搜索音乐"]', "乡村音乐")
+                await page.fill('input[placeholder="搜索音乐"]', "粤语")
                 await page.wait_for_timeout(2000)
                 button_locator = page.locator('//button/span[text()="使用"]')
                 music_amount2 = await button_locator.count()
