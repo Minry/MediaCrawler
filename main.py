@@ -689,14 +689,13 @@ async def xhs_no_wm_img(request):
         return web.json_response(response.to_dict())
 
     async with async_playwright() as playwright:
-        options = {
-            'headless': True
-        }
-        # Make sure to run headed.
-        browser = await playwright.chromium.launch(**options)
-        # Setup context however you like.
-        context = await browser.new_context()
-
+        chromium = playwright.chromium
+        xhs_data_dir = os.path.join(os.getcwd(), "browser_data",
+                                            config.USER_DATA_DIR % "xhs")
+        context = await chromium.launch_persistent_context(
+            user_data_dir=xhs_data_dir,
+            headless=True,
+        )
         page = await context.new_page()
         # 定义要监听的域名
         target_domain = 'sns-webpic-qc.xhscdn.com'

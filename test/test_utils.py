@@ -176,9 +176,12 @@ async def test_example3() -> None:
             'headless': True
         }
         # Make sure to run headed.
-        browser = await playwright.chromium.launch(**options)
+        chromium = playwright.chromium
         # Setup context however you like.
-        context = await browser.new_context()  # Pass any options
+        context = await chromium.launch_persistent_context(
+            user_data_dir="C:\\study\\python\\MediaCrawler\\browser_data\\xhs_user_data_dir",
+            headless=True,
+        ) # Pass any options
         # Pause the page, and start recording manually.
         page = await context.new_page()
         # 定义要监听的域名
@@ -197,7 +200,7 @@ async def test_example3() -> None:
                 intercepted_urls.append(url)
 
         page.on('response', response_handler)
-        await page.goto("http://xhslink.com/21sGtx", timeout=18000)
+        await page.goto("http://xhslink.com/n2dhty", timeout=18000)
         await page.wait_for_timeout(10000)
         s = a
         print("获取到的a的值为:", a)
