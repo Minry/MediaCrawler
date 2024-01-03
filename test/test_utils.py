@@ -249,6 +249,24 @@ async def test_example5() -> None:
 
 
 
+async def test_example6_1() -> None:
+    async with async_playwright() as p:
+        chromium = p.chromium
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        context = browser.contexts[0]
+        # 设置你要获取 cookie 的域名
+        target_domain = '.xiaohongshu.com'
+        # 获取所有 cookies
+        cookies = await context.cookies()
+        # 查找目标域名的 cookie
+        target_cookie = next((cookie for cookie in cookies if target_domain in cookie['domain'] and cookie['name'] == 'web_session'), None)
+        if target_cookie:
+            print(f"Value of 'web_session' cookie for {target_domain}: {target_cookie['value']}")
+
+        else:
+            print(f"Cookie 'web_session' not found for {target_domain}")
+        await browser.close()
+
 async def test_example6() -> None:
     dy_creator_data_dir ="C:\\study\\python\\MediaCrawler\\browser_data\\dy_creator_user_data_dir"
     async with async_playwright() as playwright:

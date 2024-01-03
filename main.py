@@ -73,12 +73,31 @@ dy_account_phone, dy_playwright_proxy, dy_httpx_proxy = dy_crawler.create_proxy_
 xhs_crawler = CrawlerFactory().create_crawler(platform="xhs")
 xhs_crawler.init_config(
     platform="xhs",
-    login_type="qrcode",
-    # login_type="cookie",
+    # login_type="qrcode",
+    login_type="cookie",
     account_pool=account_pool
 )
 xhs_account_phone, xhs_playwright_proxy, xhs_httpx_proxy = xhs_crawler.create_proxy_info()
 
+# 获取谷歌浏览器中的cookie
+async def get_xhs_cookie_value():
+    async with async_playwright() as p:
+        chromium = p.chromium
+        #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        context = browser.contexts[0]
+        # 设置你要获取 cookie 的域名
+        target_domain = '.xiaohongshu.com'
+        # 获取所有 cookies
+        cookies = await context.cookies()
+        # 查找目标域名的 cookie
+        target_cookie = next((cookie for cookie in cookies if target_domain in cookie['domain'] and cookie['name'] == 'web_session'), None)
+        if target_cookie:
+            print(f"Value of 'web_session' cookie for {target_domain}: {target_cookie['value']}")
+            return f"web_session={target_cookie['value']};"
+        else:
+            print(f"Cookie 'web_session' not found for {target_domain}")
+            return config.COOKIES
 
 # 判断小红书创作平台的cookie是否有效
 async def xhs_creator_cookie_auth(xhs_creator_path):
@@ -219,12 +238,13 @@ async def main():
         xhs_crawler.xhs_client = await xhs_crawler.create_xhs_client(xhs_httpx_proxy)
         if (
                 xhs_crawler.platform == "xhs" and xhs_crawler.login_type == "cookie") or not await xhs_crawler.xhs_client.ping():
+            xhs_cookie=await get_xhs_cookie_value()
             login_obj = XHSLogin(
                 login_type=xhs_crawler.login_type,
                 login_phone=xhs_account_phone,
                 browser_context=xhs_crawler.browser_context,
                 context_page=xhs_crawler.context_page,
-                cookie_str=config.COOKIES
+                cookie_str=xhs_cookie
             )
             await login_obj.begin()
             await xhs_crawler.xhs_client.update_cookies(browser_context=xhs_crawler.browser_context)
@@ -234,10 +254,10 @@ async def main():
         print(await xhs_crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
 
         # ================为playwright操作小红书页面专门创建一个context
-        xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                            config.USER_DATA_DIR % "xhs_creator")
-        if not os.path.exists(xhs_creator_data_dir) or not await xhs_creator_cookie_auth(xhs_creator_data_dir):
-            await xhs_creator_cookie_gen(xhs_creator_data_dir)
+        # xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+        #                                     config.USER_DATA_DIR % "xhs_creator")
+        # if not os.path.exists(xhs_creator_data_dir) or not await xhs_creator_cookie_auth(xhs_creator_data_dir):
+        #     await xhs_creator_cookie_gen(xhs_creator_data_dir)
 
         dy_crawler.browser_context = await dy_crawler.launch_browser(
             chromium,
@@ -268,10 +288,10 @@ async def main():
         utils.logger.info("Douyin Crawler finished ...")
 
         # 为playwright操作抖音页面专门创建一个context
-        dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                           config.USER_DATA_DIR % "dy_creator")
-        if not os.path.exists(dy_creator_data_dir) or not await dy_creator_cookie_auth(dy_creator_data_dir):
-            await dy_creator_cookie_gen(dy_creator_data_dir)
+        # dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+        #                                    config.USER_DATA_DIR % "dy_creator")
+        # if not os.path.exists(dy_creator_data_dir) or not await dy_creator_cookie_auth(dy_creator_data_dir):
+        #     await dy_creator_cookie_gen(dy_creator_data_dir)
         # block main crawler coroutine
         await asyncio.Event().wait()
 
@@ -370,12 +390,15 @@ async def create_dy_img(request):
     async with async_playwright() as playwright:
         # launch browser and create single browser context
         chromium = playwright.chromium
-        dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                           config.USER_DATA_DIR % "dy_creator")
-        dy_creator_context = await chromium.launch_persistent_context(
-            user_data_dir=dy_creator_data_dir,
-            headless=True,
-        )
+        #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        dy_creator_context = browser.contexts[0]
+        # dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+        #                                    config.USER_DATA_DIR % "dy_creator")
+        # dy_creator_context = await chromium.launch_persistent_context(
+        #     user_data_dir=dy_creator_data_dir,
+        #     headless=True,
+        # )
         page = await dy_creator_context.new_page()
         page.set_default_timeout(180000)
         # images = [
@@ -478,7 +501,6 @@ async def create_dy_img(request):
             return web.json_response(response.to_dict())
         finally:
             await page.close()
-            await dy_creator_context.close()
 
 
 
@@ -526,12 +548,15 @@ async def create_xhs_img(request):
     async with async_playwright() as playwright:
         # launch browser and create single browser context
         chromium = playwright.chromium
-        xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                            config.USER_DATA_DIR % "xhs_creator")
-        xhs_creator_context = await chromium.launch_persistent_context(
-            user_data_dir=xhs_creator_data_dir,
-            headless=True,
-        )
+        #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        xhs_creator_context = browser.contexts[0]
+        # xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
+        #                                     config.USER_DATA_DIR % "xhs_creator")
+        # xhs_creator_context = await chromium.launch_persistent_context(
+        #     user_data_dir=xhs_creator_data_dir,
+        #     headless=True,
+        # )
         page = await xhs_creator_context.new_page()
         page.set_default_timeout(180000)
         # images = [
@@ -600,7 +625,6 @@ async def create_xhs_img(request):
             return web.json_response(response.to_dict())
         finally:
             await page.close()
-            await xhs_creator_context.close()
 
 
 @routes.get("/note/{id}")
@@ -690,12 +714,15 @@ async def xhs_no_wm_img(request):
 
     async with async_playwright() as playwright:
         chromium = playwright.chromium
-        xhs_data_dir = os.path.join(os.getcwd(), "browser_data",
-                                            config.USER_DATA_DIR % "xhs")
-        context = await chromium.launch_persistent_context(
-            user_data_dir=xhs_data_dir,
-            headless=True,
-        )
+        # chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        context = browser.contexts[0]
+        # xhs_data_dir = os.path.join(os.getcwd(), "browser_data",
+        #                                     config.USER_DATA_DIR % "xhs")
+        # context = await chromium.launch_persistent_context(
+        #     user_data_dir=xhs_data_dir,
+        #     headless=True,
+        # )
         page = await context.new_page()
         # 定义要监听的域名
         target_domain = 'sns-webpic-qc.xhscdn.com'
@@ -724,7 +751,6 @@ async def xhs_no_wm_img(request):
             return web.json_response(response.to_dict())
         finally:
             await page.close()
-            await context.close()
 
 
 @routes.post("/notes/comment")

@@ -3,7 +3,8 @@ PLATFORM = "xhs"
 KEYWORDS = "python,golang"
 LOGIN_TYPE = "cookie"  # qrcode or phone or cookies
 LOGIN_TYPE_COOKIE = "cookie"  # qrcode or phone or cookies
-COOKIES = "web_session=030037a3824fcc373b5ef45dc9234a4ebc975f;"
+# COOKIES = "web_session=030037a3824fcc373b5ef45dc9234a4ebc975f;"
+COOKIES = "web_session=030037a2a60f84ec1102bd1ded224a3b49b276;"
 # enable ip proxy
 ENABLE_IP_PROXY = False
 
