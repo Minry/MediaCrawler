@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import random
+from urllib.parse import urlparse
 
 import pytest
 from playwright.async_api import async_playwright
@@ -266,6 +267,21 @@ async def test_example6_1() -> None:
         else:
             print(f"Cookie 'web_session' not found for {target_domain}")
         await browser.close()
+
+
+async def test_example6_3() -> None:
+    async with async_playwright() as p:
+        chromium = p.chromium
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        context = browser.contexts[0]
+        page = await context.new_page()
+        link='http://xhslink.com/fYSlLy'
+        await page.goto(link, timeout=18000)
+        await page.wait_for_timeout(10000)
+        a=page.url
+        redirect_url = urlparse(page.url)
+        b=redirect_url.path
+        print(a,b)
 
 async def test_example6_2() -> None:
     async with async_playwright() as p:

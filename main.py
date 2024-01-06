@@ -4,6 +4,7 @@ import random
 import sys
 import asyncio
 import argparse
+from urllib.parse import urlparse
 
 import config
 import media_platform
@@ -743,6 +744,9 @@ async def xhs_no_wm_img(request):
         try:
             await page.goto(link, timeout=18000)
             await page.wait_for_timeout(10000)
+            redirect_url= urlparse(page.url)
+            if '/explore' == redirect_url.path :
+                intercepted_urls = []
             response = ResponseObject(0, "Success", intercepted_urls)
             # 转换为 JSON 字符串
             return web.json_response(response.to_dict())
