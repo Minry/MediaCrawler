@@ -267,6 +267,50 @@ async def test_example6_1() -> None:
             print(f"Cookie 'web_session' not found for {target_domain}")
         await browser.close()
 
+async def test_example6_2() -> None:
+    async with async_playwright() as p:
+        chromium = p.chromium
+        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        context = browser.contexts[0]
+        # 获取查询参数，request.query是一个MultiDictProxy对象，我们可以向字典一样操作它
+        link = 'https://www.xiaohongshu.com/discovery/item/658d8e8e000000001d031c1d'
+        async with async_playwright() as playwright:
+            chromium = playwright.chromium
+            # chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+            browser = await chromium.connect_over_cdp('http://localhost:5003')
+            context = browser.contexts[0]
+            # xhs_data_dir = os.path.join(os.getcwd(), "browser_data",
+            #                                     config.USER_DATA_DIR % "xhs")
+            # context = await chromium.launch_persistent_context(
+            #     user_data_dir=xhs_data_dir,
+            #     headless=True,
+            # )
+            page = await context.new_page()
+            # 定义要监听的域名
+            target_url = 'edith.xiaohongshu.com/api/sns/web/v1/feed'
+            def response_handler(response):
+                url = response.url
+                print(url)
+                # 检查响应的 URL 是否包含目标域名
+                if target_url in url:
+                    # 在这里可以处理符合条件的响应，比如获取内容、存储数据等操作
+                    # 将URL添加到数组中
+                    print(response.json())
+                    print(f"URL: {url}")
+            page.on('response', response_handler)
+            try:
+                await page.goto(link, timeout=18000)
+                await page.wait_for_timeout(10000)
+                # response = ResponseObject(0, "Success", intercepted_urls)
+                # 转换为 JSON 字符串
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+                # response = ResponseObject(3, f"{e}")
+                # # 转换为 JSON 字符串
+                # return web.json_response(response.to_dict())
+            # finally:
+                # await page.close()
+
 async def test_example6() -> None:
     dy_creator_data_dir ="C:\\study\\python\\MediaCrawler\\browser_data\\dy_creator_user_data_dir"
     async with async_playwright() as playwright:

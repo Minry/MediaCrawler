@@ -251,8 +251,10 @@ async def main():
 
         # Search for notes and retrieve their comment information.
         # await crawler.search_posts()
-        print(await xhs_crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
-
+        try:
+            print(await xhs_crawler.xhs_client.get_note_by_id("648912e70000000012033f1a"))
+        except Exception as e:
+            print(e)
         # ================为playwright操作小红书页面专门创建一个context
         # xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
         #                                     config.USER_DATA_DIR % "xhs_creator")

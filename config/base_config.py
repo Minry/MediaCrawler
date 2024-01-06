@@ -4,7 +4,7 @@ KEYWORDS = "python,golang"
 LOGIN_TYPE = "cookie"  # qrcode or phone or cookies
 LOGIN_TYPE_COOKIE = "cookie"  # qrcode or phone or cookies
 # COOKIES = "web_session=030037a3824fcc373b5ef45dc9234a4ebc975f;"
-COOKIES = "web_session=030037a2a60f84ec1102bd1ded224a3b49b276;"
+COOKIES = "web_session=030037a2aa5783ed1cf4bb45e1224a1cc885d5;"
 # enable ip proxy
 ENABLE_IP_PROXY = False
 
