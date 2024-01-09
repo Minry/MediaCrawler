@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 import os
 import random
+import time
 from urllib.parse import urlparse
 
 import pytest
 from playwright.async_api import async_playwright
 
 from tools import utils
+from pyee import EventEmitter
 
-
+pytestmark = pytest.mark.asyncio
 def test_convert_cookies():
     xhs_cookies = "a1=x000101360; webId=1190c4d3cxxxx125xxx; "
     cookie_dict = utils.convert_str_cookie_to_dict(xhs_cookies)
@@ -16,7 +18,7 @@ def test_convert_cookies():
     assert cookie_dict.get("a1") == "x000101360"
 
 
-pytestmark = pytest.mark.asyncio
+
 
 
 async def test_example1() -> None:
@@ -347,3 +349,113 @@ async def test_example6() -> None:
         # 点击调试器的继续，保存cookie
         await page.close()
         await xhs_playwright_contex.close()
+
+# 获取派蒙语音
+async def test_pimon() -> None:
+    import subprocess
+    # 使用 subprocess 执行命令
+    command = [
+        'chrome',
+        '--remote-debugging-port=5005',
+        '--profile-directory="Profile 2"'
+    ]
+
+    # 使用 subprocess 启动 Chrome，不等待进程结束
+    subprocess.Popen(' '.join(command), shell=True)
+    time.sleep(10)
+    async with async_playwright() as p:
+        chromium = p.chromium
+        browser = await chromium.connect_over_cdp('http://localhost:5005')
+        context = browser.contexts[0]
+        # 设置你要获取 cookie 的域名
+        page = await context.new_page()
+        cdp_session = await context.new_cdp_session(page)
+        # 发送 CDP 命令来设置下载路径
+        await cdp_session.send('Browser.setDownloadBehavior', {
+            'behavior': 'allow',
+            'downloadPath': "C:\\study\\files\\audio",
+        })
+
+        # 定义要监听的域名
+        target_url = 'https://colab.research.google.com/drive/1grScLTMBQuUm6UvCw6dSY5jfkNashT6E'
+        try:
+            await page.goto(target_url)
+            await page.wait_for_url(target_url)
+            # 使用 id 选择器找到元素
+            element = page.locator('#connect')
+            while element is None:
+                print('等待元素...')
+                await page.wait_for_timeout(3000)
+                element = page.locator('#connect')
+            await page.click('#connect')
+            await page.wait_for_timeout(10000)
+            tooltip_text =await element.get_attribute('tooltiptext')
+            while '已连接' not in tooltip_text:
+                await page.click('#connect')
+                await page.wait_for_timeout(10000)
+                tooltip_text =await element.get_attribute('tooltiptext')
+
+            await page.click('paper-input[aria-labelledby="formwidget-1-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type("你好啊啊啊啊啊")
+            await page.wait_for_timeout(2000)
+
+            await page.click('paper-input[aria-labelledby="formwidget-3-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type("test10")
+            await page.wait_for_timeout(2000)
+            # 执行全部代码大约需要四分钟
+            await page.keyboard.press("Control+F9")
+            # 只执行最后一步生成音频大约需要1分钟
+            # await page.keyboard.press("Control+Enter")
+            #通过判断下载文件夹是否存在文件确认是否执行结束
+
+            # await page.pause()
+        except Exception as e:
+            print(e)
+        # await page.pause()
+
+
+async def test_pimon2() -> None:
+    text ="今天天气真不错啊！"
+    file_name ="测试"
+    async with async_playwright() as p:
+        chromium = p.chromium
+        browser = await chromium.connect_over_cdp("http://localhost:5005")
+        context = browser.contexts[0]
+        # 获取所有页面
+        all_pages = context.pages
+        # 选择包含特定域名的页面
+        selected_pages = [page for page in all_pages if 'colab.research.google.com' in page.url]
+        # 如果有符合条件的页面，取第一个页面进行操作
+        if not selected_pages:
+            print( "没有colab页面可供生成语音")
+            return
+        try:
+            page = selected_pages[0]
+            await page.click('paper-input[aria-labelledby="formwidget-1-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type(text)
+            await page.wait_for_timeout(2000)
+            await page.click('paper-input[aria-labelledby="formwidget-3-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type(file_name)
+            await page.wait_for_timeout(2000)
+            # 执行全部代码大约需要四分钟
+            # await page.keyboard.press("Control+F9")
+            # 只执行最后一步生成音频大约需要1分钟
+            await page.keyboard.press("Control+Enter")
+        except Exception as  e :
+            print(e)

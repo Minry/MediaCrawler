@@ -24,6 +24,7 @@ from playwright.async_api import BrowserContext
 from playwright.async_api import async_playwright
 from media_platform.xhs import field
 import time
+import subprocess
 
 xhs_creator_info = None
 dy_creator_info = None
@@ -447,7 +448,7 @@ async def create_dy_img(request):
             await page.locator('//span[text()="选择音乐"]').click()
             await page.wait_for_timeout(2000)
             await page.fill('input[placeholder="搜索音乐"]', music_theme)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(4000)
             button_locator = page.locator('//button/span[text()="使用"]')
             music_amount = await button_locator.count()
             if music_amount > 0:
@@ -456,7 +457,7 @@ async def create_dy_img(request):
             else:
                 # 执行一次 选择乡村音乐
                 await page.fill('input[placeholder="搜索音乐"]', "粤语")
-                await page.wait_for_timeout(2000)
+                await page.wait_for_timeout(4000)
                 button_locator = page.locator('//button/span[text()="使用"]')
                 music_amount2 = await button_locator.count()
                 if music_amount2 > 0:
@@ -921,11 +922,154 @@ async def get_note_at(request):
         return web.json_response(response.to_dict())
 
 
+
+@routes.get("/start/colab/{account}")
+async def start_colab(request):
+    account = request.match_info['account']
+    command = [
+        'chrome',
+        '--remote-debugging-port=5005',
+        '--disable-web-security',
+        '--profile-directory="Default"',
+    ]
+    remote_url = "http://localhost:5005"
+    colab_url = "https://colab.research.google.com/drive/1Z_Ucp_IHlrzGSNoxBlNFQUQNgQL2y-FM"
+    if account == "2018" :
+        command = [
+            'chrome',
+            '--remote-debugging-port=5005',
+            '--disable-web-security',
+            '--profile-directory="Profile 2"',
+        ]
+        remote_url = "http://localhost:5005"
+        colab_url = "https://colab.research.google.com/drive/1grScLTMBQuUm6UvCw6dSY5jfkNashT6E"
+    # 使用 subprocess 启动 Chrome，不等待进程结束
+    subprocess.Popen(' '.join(command), shell=True)
+    time.sleep(10)
+    async with async_playwright() as p:
+        try:
+            chromium = p.chromium
+            browser = await chromium.connect_over_cdp(remote_url)
+            context = browser.contexts[0]
+            # 设置你要获取 cookie 的域名
+            page = await context.new_page()
+            cdp_session = await context.new_cdp_session(page)
+            # 发送 CDP 命令来设置下载路径
+            await cdp_session.send('Browser.setDownloadBehavior', {
+                'behavior': 'allow',
+                'downloadPath': "C:\\study\\files\\audio",
+            })
+            await page.goto(colab_url)
+            await page.wait_for_url(colab_url)
+            # 使用 id 选择器找到元素
+            element = page.locator('#connect')
+            while element is None:
+                print('等待元素...')
+                await page.wait_for_timeout(3000)
+                element = page.locator('#connect')
+            await page.click('#connect')
+            await page.wait_for_timeout(10000)
+            tooltip_text =await element.get_attribute('tooltiptext')
+            while '已连接' not in tooltip_text:
+                await page.click('#connect')
+                await page.wait_for_timeout(10000)
+                tooltip_text =await element.get_attribute('tooltiptext')
+            await page.click('paper-input[aria-labelledby="formwidget-1-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type("你好啊啊啊啊啊")
+            await page.wait_for_timeout(2000)
+            await page.click('paper-input[aria-labelledby="formwidget-3-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type("start")
+            await page.wait_for_timeout(2000)
+            # 执行全部代码大约需要四分钟
+            await page.keyboard.press("Control+F9")
+            # 只执行最后一步生成音频大约需要1分钟
+            # await page.keyboard.press("Control+Enter")
+            #通过判断下载文件夹是否存在文件确认是否执行结束
+            response = ResponseObject(0, "Success")
+            return web.json_response(response.to_dict())
+        except Exception as e:
+            response = ResponseObject(3, f"{e}")
+            return web.json_response(response.to_dict())
+
+
+@routes.post("/generate/audio")
+async def generate_audio(request):
+    data = await request.json()
+    text = data.get('text')
+    file_name = data.get('file_name')
+    if text is None or text.strip() == '':
+        response = ResponseObject(3, f"语音内容不得为空")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    if file_name is None or file_name.strip() == '':
+        response = ResponseObject(3, f"语音文件名称不得为空")
+        # 转换为 JSON 字符串
+        return web.json_response(response.to_dict())
+    async with async_playwright() as p:
+        try:
+            chromium = p.chromium
+            browser = await chromium.connect_over_cdp("http://localhost:5005")
+            context = browser.contexts[0]
+            # 获取所有页面
+            all_pages = context.pages
+            # 选择包含特定域名的页面
+            selected_pages = [page for page in all_pages if 'colab.research.google.com' in page.url]
+            # 如果有符合条件的页面，取第一个页面进行操作
+            if not selected_pages:
+                response = ResponseObject(3, f"没有colab页面可供生成语音")
+                # 转换为 JSON 字符串
+                return web.json_response(response.to_dict())
+            page = selected_pages[0]
+            await page.click('paper-input[aria-labelledby="formwidget-1-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type(text)
+            await page.wait_for_timeout(2000)
+            await page.click('paper-input[aria-labelledby="formwidget-3-label"]')
+            await page.wait_for_timeout(2000)
+            await page.keyboard.press("Backspace")
+            await page.keyboard.press("Control+KeyA")
+            await page.keyboard.press("Delete")
+            await page.keyboard.type(file_name)
+            await page.wait_for_timeout(2000)
+            # 执行全部代码大约需要四分钟
+            # await page.keyboard.press("Control+F9")
+            # 只执行最后一步生成音频大约需要1分钟
+            await page.keyboard.press("Control+Enter")
+            #通过判断下载文件夹是否存在文件确认是否执行结束
+            response = ResponseObject(0, "Success")
+            return web.json_response(response.to_dict())
+        except Exception as e:
+            response = ResponseObject(3, f"{e}")
+            return web.json_response(response.to_dict())
+
+
+
+
 app = web.Application()
 app.add_routes(routes)
 
 if __name__ == '__main__':
     try:
+        command = [
+            'chrome',
+            '--remote-debugging-port=5003',
+            '--disable-web-security',
+            '--profile-directory="Default"',
+        ]
+        # 使用 subprocess 启动 Chrome，不等待进程结束
+        subprocess.Popen(' '.join(command), shell=True)
+        time.sleep(10)
         asyncio.run(main())
     except KeyboardInterrupt:
         asyncio.run(dy_crawler.close())
