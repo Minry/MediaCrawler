@@ -394,8 +394,21 @@ async def create_dy_img(request):
     async with async_playwright() as playwright:
         # launch browser and create single browser context
         chromium = playwright.chromium
-        #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
-        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        browser = None  # 初始化为 None 或者其他默认值
+        try:
+            #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+            browser = await chromium.connect_over_cdp('http://localhost:5003',timeout=10000)
+        except Exception as e:
+            print(e)
+            run_command = [
+                'chrome',
+                '--remote-debugging-port=5003',
+                '--profile-directory="Default"',
+            ]
+            # 使用 subprocess 启动 Chrome，不等待进程结束
+            subprocess.Popen(' '.join(run_command), shell=True)
+            time.sleep(10)
+            browser = await chromium.connect_over_cdp('http://localhost:5003',timeout=10000)
         dy_creator_context = browser.contexts[0]
         # dy_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
         #                                    config.USER_DATA_DIR % "dy_creator")
@@ -553,7 +566,21 @@ async def create_xhs_img(request):
         # launch browser and create single browser context
         chromium = playwright.chromium
         #chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
-        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        browser = None  # 初始化为 None 或者其他默认值
+        try:
+            # chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+            browser = await chromium.connect_over_cdp('http://localhost:5003', timeout=10000)
+        except Exception as e:
+            print(e)
+            run_command = [
+                'chrome',
+                '--remote-debugging-port=5003',
+                '--profile-directory="Default"',
+            ]
+            # 使用 subprocess 启动 Chrome，不等待进程结束
+            subprocess.Popen(' '.join(run_command), shell=True)
+            time.sleep(10)
+            browser = await chromium.connect_over_cdp('http://localhost:5003', timeout=10000)
         xhs_creator_context = browser.contexts[0]
         # xhs_creator_data_dir = os.path.join(os.getcwd(), "browser_data",
         #                                     config.USER_DATA_DIR % "xhs_creator")
@@ -719,7 +746,21 @@ async def xhs_no_wm_img(request):
     async with async_playwright() as playwright:
         chromium = playwright.chromium
         # chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
-        browser = await chromium.connect_over_cdp('http://localhost:5003')
+        browser = None  # 初始化为 None 或者其他默认值
+        try:
+            # chrome右键属性-快捷方式-目标 中添加启动参数 --remote - debugging - port = 5003
+            browser = await chromium.connect_over_cdp('http://localhost:5003', timeout=10000)
+        except Exception as e:
+            print(e)
+            run_command = [
+                'chrome',
+                '--remote-debugging-port=5003',
+                '--profile-directory="Default"',
+            ]
+            # 使用 subprocess 启动 Chrome，不等待进程结束
+            subprocess.Popen(' '.join(run_command), shell=True)
+            time.sleep(10)
+            browser = await chromium.connect_over_cdp('http://localhost:5003', timeout=10000)
         context = browser.contexts[0]
         # xhs_data_dir = os.path.join(os.getcwd(), "browser_data",
         #                                     config.USER_DATA_DIR % "xhs")
@@ -926,25 +967,25 @@ async def get_note_at(request):
 @routes.get("/start/colab/{account}")
 async def start_colab(request):
     account = request.match_info['account']
-    command = [
+    account_data = {
+        "2018": {"profile_directory": "Default", "colab_url": "https://colab.research.google.com/drive/1grScLTMBQuUm6UvCw6dSY5jfkNashT6E"},
+        "2022": {"profile_directory": "profile 1", "colab_url": "https://colab.research.google.com/drive/199JcdwhyJlB-pYQdtqOeSOrPxX6FTdyu"},
+        "2023": {"profile_directory": "profile 2", "colab_url": "https://colab.research.google.com/drive/1GwpUENsxRLMQkwJO6kSIK7eR3HJUeW7G"},
+        "2024": {"profile_directory": "profile 3", "colab_url": "https://colab.research.google.com/drive/1g68kcmXRKjUrRUWFJPEQ-GyL6_UXdWg5"},
+        "2025": {"profile_directory": "profile 4", "colab_url": "https://colab.research.google.com/drive/1mDLEJTR4C70PBbX4q1eHnhHap_VIx804"}
+    }
+    info = account_data.get(account,{"profile_directory": "Default", "colab_url": "https://colab.research.google.com/drive/1grScLTMBQuUm6UvCw6dSY5jfkNashT6E"})
+    profile_directory=info.get("profile_directory",None)
+    colab_url=info.get("colab_url",None)
+    run_command = [
         'chrome',
         '--remote-debugging-port=5005',
-        '--disable-web-security',
-        '--profile-directory="Default"',
+        '--user-data-dir=C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\AccountInfo',
+        f'--profile-directory="{profile_directory}"',
     ]
     remote_url = "http://localhost:5005"
-    colab_url = "https://colab.research.google.com/drive/1Z_Ucp_IHlrzGSNoxBlNFQUQNgQL2y-FM"
-    if account == "2018" :
-        command = [
-            'chrome',
-            '--remote-debugging-port=5005',
-            '--disable-web-security',
-            '--profile-directory="Profile 2"',
-        ]
-        remote_url = "http://localhost:5005"
-        colab_url = "https://colab.research.google.com/drive/1grScLTMBQuUm6UvCw6dSY5jfkNashT6E"
     # 使用 subprocess 启动 Chrome，不等待进程结束
-    subprocess.Popen(' '.join(command), shell=True)
+    subprocess.Popen(' '.join(run_command), shell=True)
     time.sleep(10)
     async with async_playwright() as p:
         try:
@@ -1064,7 +1105,6 @@ if __name__ == '__main__':
         command = [
             'chrome',
             '--remote-debugging-port=5003',
-            '--disable-web-security',
             '--profile-directory="Default"',
         ]
         # 使用 subprocess 启动 Chrome，不等待进程结束

@@ -3,6 +3,7 @@ import os
 import random
 import time
 from urllib.parse import urlparse
+import subprocess
 
 import pytest
 from playwright.async_api import async_playwright
@@ -352,7 +353,7 @@ async def test_example6() -> None:
 
 # 获取派蒙语音
 async def test_pimon() -> None:
-    import subprocess
+
     # 使用 subprocess 执行命令
     command = [
         'chrome',
@@ -459,3 +460,20 @@ async def test_pimon2() -> None:
             await page.keyboard.press("Control+Enter")
         except Exception as  e :
             print(e)
+
+
+
+
+async def test_pimon3() -> None:
+    command = [
+        'chrome',
+        '--remote-debugging-port=5005',
+        '--user-data-dir=C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\AccountInfo',
+        # '--profile-directory=C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\AccountInfo\\Default'
+        '--profile-directory="Profile 4"'
+    ]
+
+    # 使用 subprocess 启动 Chrome，不等待进程结束
+    # subprocess.Popen(' '.join(command), shell=True)
+    profile_directory="Profile 4"
+    print(f'--profile-directory="{profile_directory}"')
