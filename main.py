@@ -1000,6 +1000,7 @@ async def start_colab(request):
                 'behavior': 'allow',
                 'downloadPath': "C:\\study\\files\\audio",
             })
+            await page.wait_for_timeout(1000)
             await page.goto(colab_url)
             await page.wait_for_url(colab_url)
             # 使用 id 选择器找到元素
